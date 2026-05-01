@@ -488,18 +488,40 @@
     <div class="modal-overlay" id="ghQrScanModal">
         <div class="modal" style="max-width:420px;">
             <h2 style="margin-bottom:6px; display:flex; align-items:center; gap:10px;"><i class="fas fa-qrcode"></i> Escanear QR Code</h2>
-            <p style="color:var(--text-muted); font-size:0.85rem; font-family:var(--font-ui); margin-bottom:16px;">Cole o conteúdo do QR Code e digite sua senha mestra para descriptografar.</p>
-            <div class="gh-config-row">
-                <label>Conteúdo do QR Code</label>
-                <textarea id="ghQrInput" rows="3" placeholder="Cole aqui o texto do QR Code..." autocomplete="off" style="font-family:monospace; font-size:0.8rem; resize:vertical;"></textarea>
+            <p style="color:var(--text-muted); font-size:0.85rem; font-family:var(--font-ui); margin-bottom:16px;">Aponte a câmera para o QR Code exibido no outro dispositivo.</p>
+
+            <!-- Área da câmera -->
+            <div id="ghCamBox" style="position:relative; width:100%; aspect-ratio:1/1; background:#000; border-radius:10px; overflow:hidden; margin-bottom:14px; display:flex; align-items:center; justify-content:center;">
+                <video id="ghQrVideo" style="width:100%; height:100%; object-fit:cover;" playsinline autoplay muted></video>
+                <!-- Guia de mira -->
+                <div style="position:absolute; inset:0; pointer-events:none;">
+                    <svg width="100%" height="100%" viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="0" y="0" width="240" height="240" fill="rgba(0,0,0,0.35)"/>
+                        <rect x="50" y="50" width="140" height="140" fill="none" rx="4"/>
+                        <!-- Cantos brancos -->
+                        <path d="M50,70 L50,50 L70,50" stroke="white" stroke-width="4" fill="none" stroke-linecap="round"/>
+                        <path d="M170,50 L190,50 L190,70" stroke="white" stroke-width="4" fill="none" stroke-linecap="round"/>
+                        <path d="M50,170 L50,190 L70,190" stroke="white" stroke-width="4" fill="none" stroke-linecap="round"/>
+                        <path d="M190,170 L190,190 L170,190" stroke="white" stroke-width="4" fill="none" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <div id="ghCamStatus" style="position:absolute; bottom:10px; left:0; right:0; text-align:center; color:#fff; font-size:0.78rem; font-family:var(--font-ui); text-shadow:0 1px 3px rgba(0,0,0,0.8);">Iniciando câmera...</div>
             </div>
-            <div class="gh-config-row">
-                <label>Senha Mestra</label>
-                <input type="password" id="ghQrPwd" placeholder="Sua senha mestra..." autocomplete="off">
+
+            <!-- Campo de senha — aparece após leitura bem-sucedida -->
+            <div id="ghQrPwdBox" style="display:none;">
+                <div style="background:#e8f5e9; border:1px solid #a5d6a7; border-radius:8px; padding:12px; margin-bottom:12px; font-size:0.83rem; font-family:var(--font-ui); color:#2e7d32; display:flex; align-items:center; gap:8px;">
+                    <i class="fas fa-check-circle"></i> QR Code lido com sucesso! Digite sua senha mestra.
+                </div>
+                <div class="gh-config-row">
+                    <label>Senha Mestra</label>
+                    <input type="password" id="ghQrPwd" placeholder="Sua senha mestra..." autocomplete="off">
+                </div>
             </div>
+
             <div class="modal-footer">
                 <button id="btnGhQrScanCancel" style="background:transparent; border:1px solid var(--border);">Cancelar</button>
-                <button class="gh-btn primary" id="btnGhQrScanConfirm"><i class="fas fa-unlock"></i> Aplicar Config</button>
+                <button class="gh-btn primary" id="btnGhQrScanConfirm" style="display:none;"><i class="fas fa-unlock"></i> Aplicar Config</button>
             </div>
         </div>
     </div>
@@ -1750,6 +1772,7 @@ async function saveSmartVault(forceDownload = true, showNotification = true) {
             document.getElementById('btnHideQr').addEventListener('click', ghHideQr);
             document.getElementById('btnGhQrScan').addEventListener('click', ghOpenQrScanModal);
             document.getElementById('btnGhQrScanCancel').addEventListener('click', () => {
+                ghStopCamera();
                 document.getElementById('ghQrScanModal').style.display = 'none';
             });
             document.getElementById('btnGhQrScanConfirm').addEventListener('click', ghApplyQrConfig);
@@ -1867,52 +1890,134 @@ async function saveSmartVault(forceDownload = true, showNotification = true) {
             } catch(e) { return null; }
         }
 
-        // Novo dispositivo: abre modal de leitura do QR
+        // =====================================================
+        // CÂMERA — leitura do QR Code via getUserMedia + jsQR
+        // =====================================================
+
+        let ghCamStream = null;
+        let ghCamAnimFrame = null;
+        let ghQrScanned = null;
+
         function ghOpenQrScanModal() {
-            document.getElementById('ghQrInput').value = '';
+            ghQrScanned = null;
             document.getElementById('ghQrPwd').value = '';
+            document.getElementById('ghQrPwdBox').style.display = 'none';
+            document.getElementById('btnGhQrScanConfirm').style.display = 'none';
+            document.getElementById('ghCamStatus').textContent = 'Iniciando câmera...';
             document.getElementById('ghQrScanModal').style.display = 'flex';
             document.getElementById('ghConfigModal').style.display = 'none';
+            ghStartCamera();
+        }
+
+        async function ghStartCamera() {
+            try {
+                // Carrega jsQR dinamicamente (leve, ~30kb, decodifica QR de frames de vídeo)
+                if (!window.jsQR) {
+                    await new Promise((res, rej) => {
+                        const s = document.createElement('script');
+                        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js';
+                        s.onload = res; s.onerror = rej;
+                        document.head.appendChild(s);
+                    });
+                }
+                const constraints = { video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 640 } } };
+                ghCamStream = await navigator.mediaDevices.getUserMedia(constraints);
+                const video = document.getElementById('ghQrVideo');
+                video.srcObject = ghCamStream;
+                await video.play();
+                document.getElementById('ghCamStatus').textContent = 'Aponte para o QR Code...';
+                ghScanLoop();
+            } catch(e) {
+                document.getElementById('ghCamStatus').textContent = '⚠️ Câmera não disponível: ' + e.message;
+            }
+        }
+
+        function ghScanLoop() {
+            const video = document.getElementById('ghQrVideo');
+            if (!video || !ghCamStream) return;
+            if (video.readyState !== video.HAVE_ENOUGH_DATA) {
+                ghCamAnimFrame = requestAnimationFrame(ghScanLoop);
+                return;
+            }
+            // Desenha frame num canvas oculto e decodifica
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
+            if (code && code.data) {
+                ghStopCamera();
+                ghOnQrDetected(code.data);
+                return;
+            }
+            ghCamAnimFrame = requestAnimationFrame(ghScanLoop);
+        }
+
+        function ghStopCamera() {
+            cancelAnimationFrame(ghCamAnimFrame);
+            if (ghCamStream) { ghCamStream.getTracks().forEach(t => t.stop()); ghCamStream = null; }
+        }
+
+        function ghOnQrDetected(raw) {
+            try {
+                const payload = JSON.parse(raw);
+                if (!payload.v || !payload.iv || !payload.ct) throw new Error('QR inválido');
+                ghQrScanned = payload;
+                document.getElementById('ghCamStatus').textContent = '✅ QR lido! Digite sua senha mestra.';
+                document.getElementById('ghQrPwdBox').style.display = 'block';
+                document.getElementById('btnGhQrScanConfirm').style.display = 'flex';
+                document.getElementById('ghQrPwd').focus();
+            } catch(e) {
+                document.getElementById('ghCamStatus').textContent = '⚠️ QR inválido, tente novamente.';
+                ghCamAnimFrame = requestAnimationFrame(ghScanLoop);
+                ghStartCamera();
+            }
         }
 
         async function ghApplyQrConfig() {
-            const raw = document.getElementById('ghQrInput').value.trim();
+            if (!ghQrScanned) return;
             const pwd = document.getElementById('ghQrPwd').value;
-            if (!raw || !pwd) return alert('Preencha o conteúdo do QR e a senha mestra.');
-            let payload;
-            try { payload = JSON.parse(raw); } catch(e) { return alert('Conteúdo do QR inválido.'); }
+            if (!pwd) return alert('Digite sua senha mestra.');
             try {
-                // Deriva a masterKey a partir da senha + salt do vault atual
-                // Para isso precisamos do vault — buscamos do GitHub via raw URL
                 ghSetStatus('syncing', 'Verificando...');
                 let vaultJson = currentVaultData;
                 if (!vaultJson) {
                     const rawUrl = GH_RAW_VAULT_URL;
-                    if (!rawUrl) { ghSetStatus('error', 'Erro'); return alert('Não foi possível localizar o vault para descriptografar.'); }
+                    if (!rawUrl) { ghSetStatus('error', 'Erro'); return alert('Não foi possível localizar o vault.'); }
                     const r = await fetch(rawUrl + '?_=' + Date.now());
                     if (!r.ok) throw new Error('Vault não encontrado');
                     vaultJson = await r.json();
                 }
-                // Deriva a key com a senha fornecida
                 const salt = b64ToBuf(vaultJson.kdf.salt);
                 const key = await deriveKey(pwd, salt);
-                // Descriptografa o payload do QR
-                const iv = b64ToBuf(payload.iv);
-                const ct = b64ToBuf(payload.ct);
+                const iv = b64ToBuf(ghQrScanned.iv);
+                const ct = b64ToBuf(ghQrScanned.ct);
                 const dec = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
                 const config = JSON.parse(new TextDecoder().decode(dec));
-                // Aplica config
                 ghSaveConfig(config);
                 ghUpdateUI();
+                ghStopCamera();
                 document.getElementById('ghQrScanModal').style.display = 'none';
                 showToast('✅ Configuração aplicada com sucesso!');
-                // Carrega o vault com a nova config
                 await ghLoadVault();
             } catch(e) {
                 ghSetStatus('error', 'Erro');
                 alert('Senha incorreta ou QR inválido.');
             }
         }
+
+        // Fecha câmera ao cancelar
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('btnGhQrScanCancel').addEventListener('click', () => {
+                ghStopCamera();
+                document.getElementById('ghQrScanModal').style.display = 'none';
+            });
+            document.getElementById('btnGhQrScanConfirm').addEventListener('click', ghApplyQrConfig);
+            // Enter na senha mestra do QR
+            document.getElementById('ghQrPwd').addEventListener('keydown', e => { if(e.key === 'Enter') ghApplyQrConfig(); });
+        });
     </script>
 </body>
 </html>
