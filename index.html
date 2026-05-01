@@ -1,0 +1,1677 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' https: data:;">
+    <meta name="referrer" content="no-referrer">
+    <meta name="author" content="Douglas Alexandre dos Santos">
+    <title>PassMan v4.0 (Authored)</title>
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    
+    <style>
+        :root {
+            /* PASSMAN PALETTE */
+            --bg-app: #f4f6f8; --bg-panel: #ffffff; --bg-element: #f0f2f5; --bg-hover: #eef0f2;
+            --text-main: #2d3436; --text-muted: #636e72; --border: #dfe6e9;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            --primary: #2d3436; --primary-text: #ffffff;
+            --danger: #d63031; --success: #00b894; --accent: #0984e3;
+            --header-height: 64px;
+            --font-stack: 'Courier Prime', monospace;
+            --font-ui: 'Poppins', sans-serif;
+            --btp-blue: #0984e3; --btp-light: #e3f2fd;
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
+        body { background: var(--bg-app); color: var(--text-main); height: 100vh; display: flex; flex-direction: column; overflow: hidden; font-family: var(--font-stack); transition: opacity 0.3s; }
+        body.drag-over { opacity: 0.5; background: #e0e0e0; }
+
+        /* HEADER */
+        header { background: var(--bg-panel); padding: 0 20px; height: var(--header-height); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; box-shadow: var(--shadow); z-index: 100; overflow-x: auto; }
+        .brand { font-size: 1.4rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 12px; margin-right: 20px; letter-spacing: -0.5px; cursor: pointer; white-space: nowrap; }
+        .toolbar { display: flex; gap: 8px; align-items: center; }
+
+        /* BUTTONS */
+        button { padding: 0 16px; border: 1px solid var(--border); background: var(--bg-panel); color: var(--text-main); border-radius: 6px; cursor: pointer; font-family: var(--font-stack); font-size: 0.9rem; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; height: 38px; transition: all 0.2s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.03); white-space: nowrap; }
+        button:hover:not(:disabled) { background: var(--bg-hover); border-color: #b2bec3; transform: translateY(-1px); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; background: var(--bg-element); }
+        button.primary { background: var(--primary); color: var(--primary-text); border: 1px solid var(--primary); }
+        button.primary:hover { background: #4a5558; border-color: #4a5558; color: #fff; }
+        button.danger { color: var(--danger); border-color: #fab1a0; background: #fff0f0; }
+        button.danger:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
+        button.success { color: var(--success); border-color: var(--success); background: #f0fdf4; }
+        button.success:hover { background: var(--success); color: #fff; }
+        button.recent-file { background: #e3f2fd; color: var(--accent); border-color: #90caf9; width: 100%; justify-content: center; margin-bottom: 10px; height: 44px; }
+        
+        button.hub-btn { background: var(--bg-element); color: var(--text-main); border: 1px solid var(--border); font-family: var(--font-ui); font-weight:600; }
+        button.hub-btn:hover { background: var(--bg-hover); border-color: #b2bec3; }
+        button.hub-btn.active { background: var(--text-main); color: #fff; border-color: var(--text-main); }
+        
+        .action-btn { width: 40px !important; padding: 0 !important; justify-content: center !important; height: 38px !important; border-radius: 6px !important; }
+
+        /* LAYOUT */
+        main { display: flex; flex: 1; position: relative; overflow: hidden; }
+        .sidebar { width: 380px; background: var(--bg-panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 10; transition: transform 0.3s ease; }
+        .details { flex: 1; padding: 40px; overflow-y: auto; background: #ffffff; background-image: radial-gradient(#e0e0e0 1px, transparent 1px); background-size: 20px 20px; display: block; position: relative; }
+        
+        /* COPYRIGHT FOOTER */
+        .copyright-footer {
+            padding: 12px;
+            text-align: center;
+            font-size: 0.65rem;
+            color: #b2bec3;
+            border-top: 1px solid var(--border);
+            background: var(--bg-app);
+            font-family: var(--font-ui);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* HUB VIEW */
+        .hub-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--bg-app); background-image: radial-gradient(#e0e0e0 1px, transparent 1px); background-size: 20px 20px; padding: 30px; overflow-y: auto; font-family: var(--font-ui); z-index: 50; display: none; }
+        .hub-view.active { display: flex; flex-wrap: wrap; align-content: flex-start; justify-content: center; gap: 25px; }
+        
+        .hub-card { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; padding: 20px; width: 100%; max-width: 340px; box-shadow: var(--shadow); transition: transform 0.2s, box-shadow 0.2s; display: flex; flex-direction: column; height: fit-content; position: relative; }
+        .hub-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.08); border-color: #b2bec3; }
+        
+        .hub-title { font-size: 1rem; font-weight: 700; color: var(--text-main); margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid var(--bg-app); display: flex; align-items: center; gap: 10px; font-family: var(--font-stack); text-transform: uppercase; letter-spacing: -0.5px; }
+        .hub-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+        .hub-link-wrapper { display: flex; align-items: center; gap: 8px; }
+        
+        .hub-link { flex: 1; text-decoration: none; color: var(--text-main); font-size: 0.9rem; padding: 8px 12px; background: var(--bg-app); border: 1px solid transparent; border-radius: 6px; transition: all 0.2s ease; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+        .hub-link:hover { background: #fff; border-color: var(--border); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        
+        .hub-icon-box { width: 32px; height: 32px; border-radius: 6px; background: #fff; border: 1px solid var(--border); color: var(--text-muted); display: flex; align-items: center; justify-content: center; margin-right: 12px; font-size: 1rem; flex-shrink: 0; transition: all 0.3s; }
+        .hub-link:hover .hub-icon-box { background: var(--text-main); color: #fff; border-color: var(--text-main); }
+
+        .mini-btn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 6px; border: 1px solid transparent; background: transparent; color: #adb5bd; cursor: pointer; padding: 0; box-shadow: none; }
+        .mini-btn:hover { color: var(--accent); background: var(--bg-hover); }
+
+        /* SEARCH BOX */
+        .search-box { padding: 15px; border-bottom: 1px solid var(--border); background: var(--bg-app); position: relative; }
+        .search-wrapper { position: relative; display: flex; align-items: center; }
+        .search-wrapper i.search-icon { position: absolute; left: 12px; color: var(--text-muted); font-size: 0.9rem; pointer-events: none; }
+        .search-wrapper input { width: 100%; padding: 10px 35px 10px 35px; background: var(--bg-panel); border: 1px solid var(--border); color: var(--text-main); border-radius: 6px; font-family: var(--font-stack); font-size: 1rem; transition: border 0.2s; }
+        .search-wrapper input:focus { border-color: #b2bec3; outline: none; box-shadow: 0 0 0 3px rgba(0,0,0,0.05); }
+        .search-clear { position: absolute; right: 10px; background: none; border: none; color: #999; cursor: pointer; font-size: 1.1rem; padding: 0; height: auto; width: auto; box-shadow: none; display: none; }
+        .search-clear:hover { color: var(--danger); background: none; transform: none; }
+
+        .entry-list { flex: 1; overflow-y: auto; list-style: none; background: var(--bg-panel); }
+        .entry-item { padding: 18px 20px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; }
+        .entry-item:hover { background: var(--bg-app); }
+        .entry-item.active { background: #f0f4f8; border-left: 4px solid var(--text-main); }
+        .entry-title { font-weight: 700; font-size: 1.1rem; color: var(--text-main); }
+        .entry-sub { font-size: 0.85rem; color: var(--text-muted); margin-top: 5px; }
+
+        /* DETAILS UI */
+        .details-card { background: var(--bg-panel); padding: 30px; border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); max-width: 800px; margin: 0 auto; transition: opacity 0.2s; }
+        .details-card.hidden { display: none !important; opacity: 0; }
+        .details-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 2px solid var(--bg-app); }
+        .field-group { margin-bottom: 20px; }
+        .field-label { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); margin-bottom: 8px; display: block; text-transform: uppercase; letter-spacing: 1px; }
+        .field-value { font-size: 1.1rem; padding: 12px 15px; background: var(--bg-app); border: 1px solid var(--border); border-radius: 6px; width: 100%; display: flex; justify-content: space-between; align-items: center; word-break: break-all; color: #000; }
+        .env-tag { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; margin-right: 5px; color: white; margin-top: 5px; }
+        .tag-dev { background-color: #3498db; }
+        .tag-qas { background-color: #f1c40f; color: #333; }
+        .tag-prd { background-color: #e74c3c; }
+        .tag-adm { background-color: #9b59b6; }
+
+        /* MODAL */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(5px); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+        .modal { background: var(--bg-panel); padding: 30px; border: 1px solid var(--border); border-radius: 12px; width: 100%; max-width: 550px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); max-height: 90vh; overflow-y: auto; }
+        .modal input[type="text"], .modal input[type="password"], .modal textarea, .modal select { width: 100%; padding: 12px; margin-bottom: 15px; background: var(--bg-app); border: 1px solid var(--border); color: var(--text-main); border-radius: 6px; font-family: var(--font-stack); font-size: 1rem; }
+        .modal-footer { display: flex; justify-content: flex-end; gap: 12px; margin-top: 10px; border-top: 1px solid var(--border); padding-top: 20px; }
+        
+        .env-selector { display: flex; gap: 10px; margin-bottom: 20px; }
+        .env-option { flex: 1; cursor: pointer; }
+        .env-option input { display: none; }
+        .env-btn { display: flex; align-items: center; justify-content: center; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); background: var(--bg-app); transition: all 0.2s; height: 36px; }
+        .env-option input:checked + .env-btn { background: var(--text-main); color: white; border-color: var(--text-main); box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .env-option:hover .env-btn { border-color: #b2bec3; }
+
+        .hub-selection-box { background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #e9ecef; margin-bottom: 20px; }
+        .hub-label { color: var(--text-main); margin-bottom: 8px; font-weight: 700; display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
+        #hubTagsContainer { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+        .hub-tag { background: #e3f2fd; color: #007bff; border: 1px solid #bbdefb; padding: 4px 10px; border-radius: 16px; font-size: 0.8rem; display: flex; align-items: center; gap: 6px; font-family: var(--font-ui); }
+        .hub-tag i.fa-times { cursor: pointer; color: #666; font-size: 0.8rem; transition: color 0.2s; }
+        .hub-tag i.fa-times:hover { color: #d63031; }
+
+        .link-list { display: flex; flex-direction: column; gap: 8px; }
+        .link-btn { text-decoration: none; background: var(--bg-app); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); color: var(--text-main); font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s; }
+        .link-btn:hover { background: #fff; border-color: #b2bec3; }
+
+        .hidden { display: none !important; }
+        .blur { filter: blur(5px); pointer-events: none; opacity: 0.8; }
+        .back-btn { display: none; margin-bottom: 20px; background: transparent; border: none; color: var(--text-muted); padding: 0; box-shadow: none; }
+        
+        /* TOAST OPSEC */
+        .toast { position: fixed; bottom: 20px; right: 20px; background: #333; color: #fff; padding: 10px 20px; border-radius: 6px; font-size: 0.9rem; opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 2000; }
+        .toast.show { opacity: 1; }
+
+        /* GITHUB SYNC */
+        .gh-status { display: inline-flex; align-items: center; gap: 6px; font-size: 0.75rem; font-family: var(--font-ui); padding: 4px 10px; border-radius: 12px; font-weight: 600; }
+        .gh-status.connected { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
+        .gh-status.disconnected { background: #fafafa; color: #999; border: 1px solid #ddd; }
+        .gh-status.syncing { background: #e3f2fd; color: #1565c0; border: 1px solid #90caf9; }
+        .gh-status.error { background: #fff0f0; color: #c62828; border: 1px solid #ef9a9a; }
+        button.gh-btn { background: #24292e; color: #fff; border-color: #24292e; }
+        button.gh-btn:hover { background: #3a4046; border-color: #3a4046; color: #fff; }
+        .gh-config-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+        .gh-config-row label { font-size: 0.78rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; font-family: var(--font-ui); }
+        .gh-config-row input { padding: 10px 12px; background: var(--bg-app); border: 1px solid var(--border); border-radius: 6px; font-family: var(--font-stack); font-size: 0.95rem; color: var(--text-main); }
+        .gh-hint { font-size: 0.78rem; color: var(--text-muted); font-family: var(--font-ui); margin-top: 3px; }
+
+        @media (max-width: 768px) {
+            .sidebar { width: 100%; }
+            .details { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: translateX(100%); transition: transform 0.3s; z-index: 20; background: #fff; }
+            .details.active { transform: translateX(0); }
+            .back-btn { display: flex; align-items: center; gap: 8px; }
+            button span { display: none; }
+            button { justify-content: center; padding: 0 12px; }
+            .brand span { display: none; }
+            .hub-card { max-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+    <header id="app-header">
+        <div class="brand" id="brandLogo" title="Desenvolvido e Criado por Douglas Alexandre dos Santos"><i class="fas fa-file-shield"></i> <span>PassMan</span></div>
+        <div class="toolbar">
+            <button class="hub-btn" id="btnHubToggle" title="Hub BTP"><i class="fas fa-cubes"></i> <span>Hub BTP</span></button>
+            <button class="action-btn" id="btnOpenAddHub" title="Novo Sistema" style="margin-right:0;"><i class="fas fa-plus"></i></button>
+            <button class="action-btn" id="btnOpenEditHub" title="Editar Sistema" style="margin-right:0;"><i class="fas fa-pen"></i></button>
+            <button class="action-btn danger" id="btnOpenDelHub" title="Excluir Sistema" style="margin-right:0;"><i class="fas fa-trash"></i></button>
+            <button class="action-btn" id="btnOpenHubCategories" title="Categorias do Hub" style="margin-right:8px;"><i class="fas fa-tags"></i></button>
+            
+            <div style="width:1px; height:24px; background:var(--border); margin:0 8px;"></div>
+            
+            <input type="file" id="fileInput" accept=".xlsx" style="display: none;">
+            <button id="btnOpenSmart" title="Abrir Cofre"><i class="fas fa-folder-open"></i></button>
+            <button id="btnCreateVault" title="Novo Cofre"><i class="fas fa-plus"></i></button>
+            <button id="btnSave" disabled title="Salvar"><i class="fas fa-save"></i></button>
+            <div style="width:1px; height:24px; background:var(--border); margin:0 8px;"></div>
+            
+            <button id="btnImport" disabled title="Importar Excel"><i class="fas fa-file-excel"></i> <span>Imp.</span></button>
+            <button id="btnExport" disabled title="Exportar Excel"><i class="fas fa-file-export"></i> <span>Exp.</span></button>
+            <button id="btnImportSystems" disabled title="Importar Sistemas (Hub)"><i class="fas fa-file-import"></i> <span>Imp.Sys</span></button>
+            <button id="btnExportSystems" disabled title="Exportar Sistemas (Hub)"><i class="fas fa-file-export"></i> <span>Exp.Sys</span></button>
+            
+            <div style="width:1px; height:24px; background:var(--border); margin:0 8px;"></div>
+            <button class="danger" id="btnLock" disabled title="Bloquear"><i class="fas fa-lock"></i></button>
+            <div style="width:1px; height:24px; background:var(--border); margin:0 8px;"></div>
+            <span id="ghStatusBadge" class="gh-status disconnected" title="GitHub Sync"><i class="fab fa-github"></i> <span id="ghStatusText">Offline</span></span>
+            <button class="gh-btn action-btn" id="btnGhConfig" title="Configurar GitHub Sync"><i class="fas fa-cog"></i></button>
+            <button class="action-btn" id="btnGhSync" title="Sincronizar com GitHub" disabled><i class="fas fa-cloud-upload-alt"></i></button>
+        </div>
+</header>
+
+    <main id="main-area" class="blur">
+        <div class="hub-view" id="hubPanel"></div>
+
+        <div class="sidebar" id="sidebarPanel">
+            <div class="search-box">
+                <div class="search-wrapper">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="searchInput" placeholder="Buscar..." autocomplete="off">
+                    <button class="search-clear" id="btnSearchClear" title="Limpar">
+                        <i class="fas fa-times-circle"></i>
+                    </button>
+                </div>
+            </div>
+            <div style="padding: 15px; border-bottom: 1px solid var(--border); display:flex;">
+                <button class="primary" style="flex:1; justify-content: center; text-transform:uppercase; letter-spacing:1px;" id="btnAdd">
+                    <i class="fas fa-plus"></i> <span style="display:inline; margin-left:8px;">Nova Senha</span>
+                </button>
+            </div>
+            <ul class="entry-list" id="entryList"></ul>
+            
+            <div class="copyright-footer">
+                Desenvolvido e Criado por<br>Douglas Alexandre dos Santos
+            </div>
+        </div>
+
+        <div class="details" id="detailsPanel">
+            <div class="details-card hidden" id="detailsCard">
+                <button class="back-btn" id="btnBackMobile"><i class="fas fa-arrow-left"></i> VOLTAR</button>
+                
+                <div class="details-header">
+                    <div class="details-title">
+                        <h2 id="detService">Serviço</h2>
+                        <div id="detEnvs"></div>
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <button title="Editar" id="btnEdit" class="action-btn"><i class="fas fa-pen"></i></button>
+                        <button class="danger action-btn" title="Excluir" id="btnDel"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label">Usuário / Email</label>
+                    <div class="field-value">
+                        <span id="detUser" style="font-family: monospace;">-</span>
+                        <button id="btnCopyUser" style="width:36px; padding:0; justify-content:center; border:none; background:transparent;"><i class="fas fa-copy"></i></button>
+                    </div>
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label">Senha</label>
+                    <div class="field-value">
+                        <span id="detPass" style="letter-spacing: 2px;">••••••••</span>
+                        <div style="display:flex; gap:8px;">
+                            <button id="btnTogglePass" style="width:36px; padding:0; justify-content:center; border:none; background:transparent;"><i class="fas fa-eye"></i></button>
+                            <button id="btnCopyPass" style="width:36px; padding:0; justify-content:center; border:none; background:transparent;"><i class="fas fa-copy"></i></button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label">URL Principal</label>
+                    <div class="field-value"><a href="#" id="detUrl" target="_blank" rel="noopener noreferrer" style="text-decoration:none; color:var(--text-main);">-</a></div>
+                </div>
+
+                <div class="field-group" id="groupLinkedSystems" style="display:none;">
+                    <label class="field-label"><i class="fas fa-link"></i> Links Vinculados (Hub)</label>
+                    <div class="link-list" id="detHubLinks"></div>
+                </div>
+
+                <div class="field-group">
+                    <label class="field-label">Notas</label>
+                    <div class="field-value" id="detNotes" style="min-height: 100px; align-items: start; white-space: pre-wrap; line-height: 1.6;">-</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div class="modal-overlay" id="passwordModal" style="display: flex;">
+        <div class="modal">
+            <div style="text-align:center; margin-bottom:20px;"><i class="fas fa-shield-halved fa-3x" style="color:var(--text-main);"></i></div>
+            <h2 id="pwdTitle">Acesso Restrito</h2>
+            <div id="pwdInputContainer" class="hidden">
+                <label class="field-label" style="text-align:center;">SENHA MESTRA</label>
+                <input type="password" id="masterPwd" placeholder="Digite para desbloquear..." style="text-align:center; letter-spacing:2px;" autocomplete="off">
+            </div>
+            <div class="modal-footer" id="modalFooterInit" style="flex-direction:column; border:none;">
+                <button id="btnReopen" class="recent-file hidden">
+                    <i class="fas fa-history"></i> Reabrir <span id="lastFileName">arquivo</span>
+                </button>
+                <div style="display:flex; gap:10px;">
+                    <button id="btnModalOpen" style="flex:1;"><i class="fas fa-upload"></i> Abrir</button>
+                    <button class="primary" id="btnModalCreate" style="flex:1;"><i class="fas fa-plus"></i> Criar</button>
+                </div>
+            </div>
+            <div class="modal-footer hidden" id="modalFooterUnlock" style="border:none;">
+                <button class="primary" style="width:100%" id="btnModalUnlock">DESBLOQUEAR</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="addHubModal">
+        <div class="modal">
+            <h2 style="margin-bottom:15px; text-align:left;">Novo Sistema no Hub</h2>
+            <label class="field-label">Nome do Sistema *</label>
+            <input type="text" id="addHubName" placeholder="Ex: Portal XPTO" autocomplete="off">
+            <label class="field-label">URL *</label>
+            <input type="text" id="addHubUrl" placeholder="https://..." autocomplete="off">
+            <label class="field-label">Categoria</label>
+            <div id="addHubCatBox" style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:15px;"></div>
+            <div class="modal-footer">
+                <button id="btnCancelAddHub" style="background:transparent; border:1px solid var(--border);">Cancelar</button>
+                <button class="primary" id="btnSaveHub">ADICIONAR</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="editHubModal">
+        <div class="modal">
+            <h2 style="margin-bottom:15px; text-align:left;">Editar Sistema</h2>
+            <label class="field-label">Selecionar Sistema</label>
+            <select id="editHubSelect"></select>
+            <hr style="border:0; border-top:1px dashed #ccc; margin:15px 0;">
+            <label class="field-label">Nome do Sistema *</label>
+            <input type="text" id="editHubName" autocomplete="off">
+            <label class="field-label">URL *</label>
+            <input type="text" id="editHubUrl" autocomplete="off">
+            <label class="field-label">Categoria</label>
+            <div id="editHubCatBox" style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:15px;"></div>
+            <div class="modal-footer">
+                <button id="btnCancelEditHub" style="background:transparent; border:1px solid var(--border);">Cancelar</button>
+                <button class="danger" id="btnDeleteEditHub" title="Excluir este sistema do Hub"><i class="fas fa-trash"></i> EXCLUIR</button>
+                <button class="primary" id="btnSaveEditHub">SALVAR</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="delHubModal">
+        <div class="modal">
+            <h2 style="margin-bottom:15px; text-align:left;">Excluir Sistema</h2>
+            <p style="color:#d63031; margin-bottom:15px;">Atenção: Esta ação não pode ser desfeita.</p>
+            <label class="field-label">Selecionar Sistema</label>
+            <select id="delHubSelect"></select>
+            <div class="modal-footer">
+                <button id="btnCancelDelHub" style="background:transparent; border:1px solid var(--border);">Cancelar</button>
+                <button class="danger" id="btnConfirmDelHub">EXCLUIR</button>
+            </div>
+        </div>
+    </div>
+
+    
+<div class="modal-overlay" id="hubCategoriesModal">
+    <div class="modal">
+        <h2 style="margin-bottom:15px; text-align:left;">Categorias do Hub</h2>
+
+        <label class="field-label">Adicionar categoria</label>
+        <div style="display:flex; gap:10px; margin-bottom:15px;">
+            <input type="text" id="inpNewHubCategory" placeholder="Ex: Monitoramento" autocomplete="off" style="margin-bottom:0;">
+            <button class="primary" id="btnAddHubCategory" style="height:auto;">Adicionar</button>
+        </div>
+
+        <label class="field-label">Categorias cadastradas</label>
+        <div id="hubCategoriesList" style="display:flex; flex-direction:column; gap:8px;"></div>
+
+        <div class="modal-footer">
+            <button id="btnCloseHubCategories" style="background:transparent; border:1px solid var(--border);">Fechar</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="entryModal">
+        <div class="modal">
+            <h2 id="entryModalTitle" style="margin-bottom:15px; text-align:left;">Credencial</h2>
+            <input type="hidden" id="entryId">
+            
+            <div class="hub-selection-box">
+                <label class="hub-label"><i class="fas fa-cubes"></i> Vincular Sistemas (Hub)</label>
+                <select id="selHubSystem" style="margin-bottom:0; background:#fff;">
+                    <option value="">-- Selecione para Adicionar --</option>
+                </select>
+                <div id="hubTagsContainer"></div>
+            </div>
+
+            <label class="field-label">Nome do Serviço *</label>
+            <input type="text" id="inpService" placeholder="Ex: Meu Usuário SAP BTP..." autocomplete="off">
+            
+            <label class="field-label">Ambiente</label>
+            <div class="env-selector">
+                <label class="env-option"><input type="checkbox" id="chkDev"><span class="env-btn">DEV</span></label>
+                <label class="env-option"><input type="checkbox" id="chkQas"><span class="env-btn">QAS</span></label>
+                <label class="env-option"><input type="checkbox" id="chkPrd"><span class="env-btn">PRD</span></label>
+                <label class="env-option"><input type="checkbox" id="chkAdm"><span class="env-btn">ADM</span></label>
+            </div>
+
+            <label class="field-label">Usuário *</label>
+            <input type="text" id="inpUser" placeholder="Usuario/Email" autocomplete="off">
+            <label class="field-label">Senha *</label>
+            <div style="display:flex; gap:10px; margin-bottom:15px;">
+                <input type="password" id="inpPass" style="margin-bottom:0;" placeholder="Senha" autocomplete="new-password">
+                <button id="btnToggleInputPass" style="height:auto; width:50px; justify-content:center;"><i class="fas fa-eye" id="eyeIcon"></i></button>
+            </div>
+            <label class="field-label">URL Principal</label>
+            <input type="text" id="inpUrl" placeholder="https://..." autocomplete="off">
+            <label class="field-label">Notas</label>
+            <textarea id="inpNotes" rows="2" autocomplete="off"></textarea>
+            
+            <div class="modal-footer">
+                <button id="btnCancelEntry" style="background:transparent; border:1px solid var(--border);">Cancelar</button>
+                <button class="primary" id="btnSaveEntry">SALVAR</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="toast" class="toast">Info</div>
+
+    <!-- MODAL GITHUB CONFIG -->
+    <div class="modal-overlay" id="ghConfigModal">
+        <div class="modal" style="max-width:480px;">
+            <h2 style="margin-bottom:6px; display:flex; align-items:center; gap:10px;"><i class="fab fa-github"></i> GitHub Sync</h2>
+            <p style="color:var(--text-muted); font-size:0.85rem; font-family:var(--font-ui); margin-bottom:20px;">Suas credenciais ficam salvas apenas neste navegador (localStorage).</p>
+
+            <div class="gh-config-row">
+                <label>Personal Access Token</label>
+                <input type="password" id="ghToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off">
+                <span class="gh-hint">Token com permissão <strong>repo</strong>. <a href="https://github.com/settings/tokens/new?scopes=repo&description=PassMan" target="_blank" rel="noopener">Criar token →</a></span>
+            </div>
+            <div class="gh-config-row">
+                <label>Usuário / Organização</label>
+                <input type="text" id="ghOwner" placeholder="seu-usuario-github" autocomplete="off">
+            </div>
+            <div class="gh-config-row">
+                <label>Nome do Repositório</label>
+                <input type="text" id="ghRepo" placeholder="passman-vault" autocomplete="off">
+            </div>
+            <div class="gh-config-row">
+                <label>Caminho do vault.json no repositório</label>
+                <input type="text" id="ghPath" placeholder="vault.json" autocomplete="off">
+                <span class="gh-hint">Ex: vault.json ou data/vault.json</span>
+            </div>
+
+            <div style="background:var(--bg-app); border:1px solid var(--border); border-radius:8px; padding:14px; margin-bottom:16px; font-family:var(--font-ui); font-size:0.82rem; color:var(--text-muted); line-height:1.6;">
+                <strong style="color:var(--text-main);">Como configurar:</strong><br>
+                1. Crie um repositório <strong>privado</strong> no GitHub<br>
+                2. Faça upload do seu <code>vault.json</code> nele<br>
+                3. Crie um <a href="https://github.com/settings/tokens/new?scopes=repo&description=PassMan" target="_blank" rel="noopener">Personal Access Token</a> com escopo <strong>repo</strong><br>
+                4. Preencha os campos acima e clique em Conectar
+            </div>
+
+            <div class="modal-footer">
+                <button id="btnGhClear" class="danger" style="margin-right:auto;"><i class="fas fa-trash"></i> Limpar</button>
+                <button id="btnGhConfigCancel" style="background:transparent; border:1px solid var(--border);">Cancelar</button>
+                <button class="gh-btn primary" id="btnGhConfigSave"><i class="fas fa-plug"></i> Conectar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const defaultBtpLinks = [
+            { category: "SAP BTP Foundry/CPEA", icon: "fas fa-cubes", items: [ { name: "Transporte Iflows", url: "https://devops-alm-tools.ts.cfapps.us10.hana.ondemand.com/main/webapp/index.html", icon: "fas fa-shipping-fast" }, { name: "Cópia de Iflows", url: "https://integration-suite-qas.it-cpi003-rt.cfapps.us10.hana.ondemand.com/http/whint/iflowcopy", icon: "fas fa-shipping-fast" }, { name: "Int. Suite DEV/QAS", url: "https://integration-suite-qas.integrationsuite.cfapps.us10.hana.ondemand.com/shell/home", icon: "fas fa-cloud" }, { name: "Int. Suite PRD", url: "https://integration-suite-prd.integrationsuite.cfapps.us10.hana.ondemand.com/shell/home", icon: "fas fa-cloud" }, { name: "IAS - DEV", url: "https://aztcvw1u5.accounts.ondemand.com/admin/", icon: "fas fa-user-shield" }, { name: "IAS - PRD", url: "https://adnd3hg4b.accounts.ondemand.com/admin/", icon: "fas fa-user-shield" }, { name: "Cockpit CPEA", url: "https://amer.cockpit.btp.cloud.sap/cockpit#/globalaccount/CA1105938TID000000000741455273", icon: "fas fa-tachometer-alt" }, { name: "Adv Event Mesh DEV", url: "https://us10.console.pubsub.em.services.cloud.sap/login?tenant-id=fd907ab4-3289-4839-a019-00da8af14e15", icon: "fas fa-envelope" } ] },
+            { category: "SAP BTP NEO", icon: "fas fa-code-branch", items: [ { name: "HANA FYW Monitor JOB", url: "https://fywd4b18b9bb.us2.hana.ondemand.com/sap/hana/xs/admin/jobs/#", icon: "fas fa-server" }, { name: "CPI 5060 PRD", url: "https://l5060-tmn.hci.us2.hana.ondemand.com/itspaces/", icon: "fas fa-server" }, { name: "CPI 5061 PRD", url: "https://l5061-tmn.hci.us2.hana.ondemand.com/itspaces/", icon: "fas fa-server" }, { name: "CPI 5048 DEV", url: "https://l5048-tmn.hci.us2.hana.ondemand.com/itspaces/", icon: "fas fa-server" }, { name: "API MAN DEV", url: "https://produs2apiportalapimgmtpphx-d53020a3d.us2.hana.ondemand.com/shell/configure", icon: "fas fa-project-diagram" }, { name: "API MAN QAS", url: "https://produs2apiportalapimgmtpphx-gf1oh4ruxg.us2.hana.ondemand.com/", icon: "fas fa-project-diagram" }, { name: "API MAN PRD", url: "https://produs2apiportalapimgmtpphx-d6b80a3dd.us2.hana.ondemand.com/", icon: "fas fa-project-diagram" }, { name: "Cockpit BTP Neo", url: "https://amer.cockpit.btp.cloud.sap/cockpit#/globalaccount/CA1105938", icon: "fas fa-tachometer-alt" } ] },
+            { category: "Cloud Connectors", icon: "fas fa-plug", items: [ { name: "CC DEV On Premise 304", url: "https://aslx304br.natura.com.br:8443/", icon: "fas fa-link" }, { name: "CC DEV On Premise 305", url: "https://aslx305br.natura.com.br:8443/", icon: "fas fa-link" }, { name: "CC PRD On Premise 306", url: "https://aslx306br.natura.com.br:8443/", icon: "fas fa-link" }, { name: "CC PRD On Premise 307", url: "https://aslx307br.natura.com.br:8443/", icon: "fas fa-link" }, { name: "CC DEV HEC SAP", url: "https://vhnacccdcc01.sap.naturaeco.com:8443/", icon: "fas fa-globe" }, { name: "CC PRD HEC Node 1", url: "https://vhnacccpcc01.sap.naturaeco.com:8443/", icon: "fas fa-globe" }, { name: "CC PRD HEC Node 2", url: "https://vhnacccpcc02.sap.naturaeco.com:8443/", icon: "fas fa-globe" } ] },
+            { category: "Ferramentas ITSM", icon: "fas fa-tools", items: [ { name: "Service Now User", url: "https://itsmnatura.service-now.com/nco", icon: "fas fa-headset" }, { name: "Service Now Analista", url: "https://itsmnatura.service-now.com/now/nav/ui/classic/params/target/%24pa_dashboard.do", icon: "fas fa-user-tie" }, { name: "JIRA", url: "https://natura.atlassian.net/jira/your-work", icon: "fab fa-jira" }, { name: "TD Interativa", url: "http://tdinterativa.natura.net/CAisd/pdmweb.exe", icon: "fas fa-clipboard-list" }, { name: "MultiDados EPIUSE", url: "https://epiuse.multidadosti.com.br/login.php", icon: "fas fa-database" }, { name: "Microsoft Natura", url: "https://myaccount.microsoft.com/", icon: "fab fa-microsoft" } ] },
+            { category: "Ferramentas Trabalho", icon: "fas fa-laptop-code", items: [ { name: "One Time Secret", url: "https://onetimesecret.com/", icon: "fas fa-key" }, { name: "Gerador Senha McAfee", url: "https://www.mcafee.com/en-us/password-generator.html", icon: "fas fa-key" }, { name: "WebHook Teste", url: "https://webhook.site/", icon: "fas fa-bell" }, { name: "Base64 Decode", url: "https://www.base64decode.org/", icon: "fas fa-lock-open" }, { name: "Regioes IP SAP BTP", url: "https://help.sap.com/docs/btp/sap-business-technology-platform/regions-and-api-endpoints-available-for-cloud-foundry-environment?locale=en-US", icon: "fas fa-map-marker-alt" } ] },
+            { category: "Monitoramento", icon: "fas fa-chart-line", items: [ { name: "Monitoramento AWS", url: "https://health.aws.amazon.com/health/status", icon: "fas fa-key" }, { name: "Monitoramento SAP BTP", url: "https://me.sap.com/systemsprovisioning/availability", icon: "fas fa-bell" } ] }
+        ];
+
+        const PBKDF2_ITERATIONS = 310000, SALT_LEN = 16, IV_LEN = 12;
+        let vault = { header: null, entries: [], hubItems: [], hubCategories: ["Geral"] }, masterKey = null, currentVaultData = null, isLocked = true, selectedId = null, fileHandle = null, hubMode = false, tempLinkedSystems = [];
+
+        // OPSEC CONSTANTS
+        const AUTO_LOCK_TIME = 5 * 60 * 1000; // 5 minutos
+        const CLIPBOARD_CLEAR_TIME = 60 * 1000; // 60 segundos
+        let autoLockTimer = null;
+
+        const b64ToBuf = (b64) => Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+        const bufToB64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+        const nowIso = () => new Date().toISOString();
+
+        async function getDB() { return new Promise((res, rej) => { const req = indexedDB.open('PassManDB', 1); req.onerror=()=>rej(req.error); req.onsuccess=()=>res(req.result); req.onupgradeneeded=(e)=>{e.target.result.createObjectStore('handles', {keyPath:'id'});}; }); }
+        async function saveFileHandleToDB(h) { const db=await getDB(); await db.transaction('handles','readwrite').objectStore('handles').put({id:'lastFile', handle:h, name:h.name}); }
+        async function getLastFileHandle() { try{ const db=await getDB(); return new Promise(r=>{const req=db.transaction('handles','readonly').objectStore('handles').get('lastFile'); req.onsuccess=()=>r(req.result); req.onerror=()=>r(null);}); }catch(e){return null;} }
+
+        async function deriveKey(pwd, salt) {
+            const enc = new TextEncoder();
+            const km = await crypto.subtle.importKey("raw", enc.encode(pwd), { name: "PBKDF2" }, false, ["deriveKey"]);
+            return crypto.subtle.deriveKey({ name: "PBKDF2", salt: salt, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" }, km, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+        }
+        async function encryptVault() {
+            if (!masterKey) return null;
+            const iv = crypto.getRandomValues(new Uint8Array(IV_LEN));
+            const dataEnc = new TextEncoder().encode(JSON.stringify({ entries: vault.entries, hubItems: vault.hubItems, hubCategories: vault.hubCategories }));
+            const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, masterKey, dataEnc);
+            return { version: vault.header.version, kdf: vault.header.kdf, payload: { nonce: bufToB64(iv), ciphertext: bufToB64(ct) } };
+        }
+        async function decryptVault(json, pwd) {
+            try {
+                const salt = b64ToBuf(json.kdf.salt);
+                const iv = b64ToBuf(json.payload.nonce);
+                const ct = b64ToBuf(json.payload.ciphertext);
+                const key = await deriveKey(pwd, salt);
+                const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, key, ct);
+                const data = JSON.parse(new TextDecoder().decode(decrypted));
+                masterKey = key;
+                vault.header = { version: json.version, kdf: json.kdf };
+                vault.entries = data.entries || [];
+                vault.hubItems = data.hubItems || defaultBtpLinks;
+                vault.hubCategories = normalizeHubCategories(data.hubCategories, vault.hubItems);
+                return true;
+            } catch (e) { return false; }
+        }
+
+        // --- OPSEC AUTO-LOCK ---
+        function resetAutoLock() {
+            clearTimeout(autoLockTimer);
+            if (!isLocked) {
+                autoLockTimer = setTimeout(() => {
+                    if (!isLocked) {
+                        lockVault();
+                        showToast("Bloqueio automático por inatividade");
+                    }
+                }, AUTO_LOCK_TIME);
+            }
+        }
+
+        // --- CLIPBOARD CLEARING ---
+        function clearClipboardAfterDelay() {
+            setTimeout(async () => {
+                try {
+                    await navigator.clipboard.writeText('');
+                } catch (e) {}
+            }, CLIPBOARD_CLEAR_TIME);
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg; t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 3000);
+        }
+
+        // --- EVENT LISTENERS SETUP (NO INLINE JS) ---
+        window.addEventListener('DOMContentLoaded', async () => {
+            // Setup GitHub listeners primeiro
+            setupGithubListeners();
+            ghUpdateUI();
+
+            // Se GitHub está configurado, carrega vault de lá automaticamente
+            if (ghIsConfigured()) {
+                await ghLoadVault();
+            } else {
+                // Modo local: tenta reabrir último arquivo
+                const record = await getLastFileHandle();
+                if (record && record.handle) {
+                    document.getElementById('lastFileName').textContent = record.name;
+                    document.getElementById('btnReopen').classList.remove('hidden');
+                    fileHandle = record.handle; 
+                }
+                if(isLocked) { vault.hubItems = defaultBtpLinks; renderHub(); }
+            }
+
+            // Attach Event Listeners
+            setupEventListeners();
+            
+            // OpSec Activity Hooks
+            ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(evt => {
+                window.addEventListener(evt, resetAutoLock);
+            });
+        });
+
+        document.body.addEventListener('dragover', (e)=>{e.preventDefault(); document.body.classList.add('drag-over');});
+        document.body.addEventListener('dragleave', (e)=>{e.preventDefault(); document.body.classList.remove('drag-over');});
+        document.body.addEventListener('drop', async (e)=>{
+            e.preventDefault(); document.body.classList.remove('drag-over');
+            const item = [...e.dataTransfer.items][0];
+            if (item && item.kind==='file') {
+                if(item.getAsFileSystemHandle) {
+                    const h = await item.getAsFileSystemHandle();
+                    if(h.kind==='file' && h.name.endsWith('.json')){ fileHandle=h; await saveFileHandleToDB(h); readFileContent(await h.getFile()); return; }
+                }
+                const f = item.getAsFile();
+                if(f.name.endsWith('.json')) readFileContent(f);
+                else if(f.name.endsWith('.xlsx')) readExcelFile(f);
+            }
+        });
+
+        function setupEventListeners() {
+            // Brand & Header
+            document.getElementById('brandLogo').addEventListener('click', () => toggleHub(false));
+            document.getElementById('btnHubToggle').addEventListener('click', () => toggleHub());
+            document.getElementById('btnOpenAddHub').addEventListener('click', openAddHubModal);
+            document.getElementById('btnOpenEditHub').addEventListener('click', openEditHubModal);
+            document.getElementById('btnOpenDelHub').addEventListener('click', openDelHubModal);
+            document.getElementById('btnOpenHubCategories').addEventListener('click', openHubCategoriesModal);
+                        document.getElementById('btnCloseHubCategories').addEventListener('click', () => closeModal('hubCategoriesModal'));
+                        document.getElementById('btnAddHubCategory').addEventListener('click', addHubCategoryFromUI);
+                        document.getElementById('hubCategoriesList').addEventListener('click', onHubCategoriesListClick);
+            document.getElementById('fileInput').addEventListener('change', handleLegacyFileSelect);
+            document.getElementById('btnOpenSmart').addEventListener('click', openSmartFile);
+            document.getElementById('btnCreateVault').addEventListener('click', createNewVault);
+            document.getElementById('btnSave').addEventListener('click', () => saveSmartVault());
+            document.getElementById('btnImport').addEventListener('click', importExcel);
+            document.getElementById('btnExport').addEventListener('click', exportExcel);
+            document.getElementById('btnImportSystems').addEventListener('click', importSystemsExcel);
+            document.getElementById('btnExportSystems').addEventListener('click', exportSystemsExcel);
+            document.getElementById('btnLock').addEventListener('click', lockVault);
+
+            // Sidebar
+            document.getElementById('searchInput').addEventListener('keyup', debounceSearch);
+            document.getElementById('btnSearchClear').addEventListener('click', clearSearch);
+            document.getElementById('btnAdd').addEventListener('click', () => openEntryModal());
+
+            // Details
+            document.getElementById('btnBackMobile').addEventListener('click', closeDetailsMobile);
+            document.getElementById('btnEdit').addEventListener('click', editCurrentEntry);
+            document.getElementById('btnDel').addEventListener('click', deleteCurrentEntry);
+            document.getElementById('btnCopyUser').addEventListener('click', copyUser);
+            document.getElementById('btnTogglePass').addEventListener('click', togglePass);
+            document.getElementById('btnCopyPass').addEventListener('click', copyPass);
+            document.getElementById('detailsPanel').addEventListener('click', closeDetailsIfBackground);
+
+            // Password Modal
+            document.getElementById('btnReopen').addEventListener('click', reopenLastFile);
+            document.getElementById('btnModalOpen').addEventListener('click', openSmartFile);
+            document.getElementById('btnModalCreate').addEventListener('click', createNewVault);
+            document.getElementById('btnModalUnlock').addEventListener('click', unlockVault);
+            document.getElementById('masterPwd').addEventListener('keypress', (e) => { if(e.keyCode==13) unlockVault(); });
+
+            // Add Hub Modal
+            document.getElementById('btnSaveHub').addEventListener('click', saveHubSystem);
+            document.getElementById('btnCancelAddHub').addEventListener('click', () => closeModal('addHubModal'));
+
+            // Edit Hub Modal
+            document.getElementById('editHubSelect').addEventListener('change', loadSystemForEdit);
+            document.getElementById('btnSaveEditHub').addEventListener('click', saveEditedSystem);
+            document.getElementById('btnDeleteEditHub').addEventListener('click', deleteSystemFromEdit);
+            document.getElementById('btnCancelEditHub').addEventListener('click', () => closeModal('editHubModal'));
+
+            // Del Hub Modal
+            document.getElementById('btnConfirmDelHub').addEventListener('click', deleteSystem);
+            document.getElementById('btnCancelDelHub').addEventListener('click', () => closeModal('delHubModal'));
+
+            // Entry Modal
+            document.getElementById('selHubSystem').addEventListener('change', addHubTagFromSelect);
+            document.getElementById('btnToggleInputPass').addEventListener('click', toggleInputPassType);
+            document.getElementById('btnSaveEntry').addEventListener('click', saveEntry);
+            document.getElementById('btnCancelEntry').addEventListener('click', () => closeModal('entryModal'));
+
+            // --- EVENT DELEGATION FOR DYNAMIC ELEMENTS ---
+            
+            // 1. Hub Panel Clicks (Delegated)
+            document.getElementById('hubPanel').addEventListener('click', (e) => {
+                const link = e.target.closest('.hub-link');
+                if (link) {
+                    interactWithSystem(link.dataset.url, link.dataset.name);
+                }
+            });
+
+            // 2. Entry List Clicks (Delegated)
+            document.getElementById('entryList').addEventListener('click', (e) => {
+                const item = e.target.closest('.entry-item');
+                if (item) {
+                    selectEntry(item.dataset.id);
+                }
+            });
+
+            // 3. Hub Tags Removal (Delegated)
+            document.getElementById('hubTagsContainer').addEventListener('click', (e) => {
+                if (e.target.classList.contains('fa-times')) {
+                    removeHubTag(Number(e.target.dataset.index));
+                }
+            });
+        }
+
+        function renderHub() {
+            const container = document.getElementById('hubPanel'); container.innerHTML = '';
+            const items = vault.hubItems || defaultBtpLinks;
+            items.forEach(group => {
+                const card = document.createElement('div'); card.className = 'hub-card';
+                let linksHtml = '';
+                group.items.forEach(item => {
+                    // Refactor: Added data attributes for Event Delegation
+                    linksHtml += `
+                    <div class="hub-link-wrapper">
+                        <div class="hub-link" data-url="${item.url}" data-name="${item.name}">
+                            <div class="hub-icon-box"><i class="${item.icon || 'fas fa-link'}"></i></div>
+                            <span style="flex:1; text-align:left;">${item.name}</span>
+                        </div>
+                    </div>`;
+                });
+                card.innerHTML = `<div class="hub-title"><i class="${group.icon || 'fas fa-layer-group'}"></i> ${group.category}</div><div class="hub-grid">${linksHtml}</div>`;
+                container.appendChild(card);
+            });
+        }
+
+        function fixLegacyIcons() {
+            if(!vault.hubItems) return;
+            let changed = false;
+            vault.hubItems.forEach(g => {
+                if(!g.icon.includes('fa-')) { g.icon = 'fas ' + g.icon; changed=true; }
+                g.items.forEach(i => {
+                    if(!i.icon.includes('fas') && !i.icon.includes('fab')) {
+                        if(i.name.toLowerCase().includes('jira') || i.name.toLowerCase().includes('microsoft') || i.name.toLowerCase().includes('google')) {
+                            i.icon = 'fab ' + i.icon.replace('fa-', 'fa-');
+                        } else {
+                            i.icon = 'fas ' + i.icon.replace('fa-', 'fa-');
+                        }
+                        changed = true;
+                    }
+                });
+            });
+            if(changed) console.log("Icons updated automatically.");
+        }
+
+        function escapeHtml(str) {
+            return String(str ?? '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+        }
+        function escapeAttr(str) {
+            // Para atributos HTML (mantém simples e seguro)
+            return escapeHtml(str).replace(/`/g, '&#96;');
+        }
+
+        function normalizeHubCategories(savedCategories, hubItems) {
+            const base = new Set();
+            base.add('Geral');
+
+            (hubItems || []).forEach(g => {
+                if (g && typeof g.category === 'string' && g.category.trim()) base.add(g.category.trim());
+            });
+
+            if (Array.isArray(savedCategories)) {
+                savedCategories.forEach(c => {
+                    if (typeof c === 'string' && c.trim()) base.add(c.trim());
+                });
+            }
+
+            const arr = Array.from(base);
+            arr.sort((a,b) => a.localeCompare(b, 'pt-BR'));
+            return ['Geral', ...arr.filter(x => x !== 'Geral')];
+        }
+
+        function renderCategoryCheckboxes(containerId, selectedCategory) {
+            const box = document.getElementById(containerId);
+            if(!box) return;
+            box.innerHTML = '';
+
+            const cats = vault.hubCategories || ['Geral'];
+            const current = selectedCategory || 'Geral';
+
+            cats.forEach(cat => {
+                const id = `${containerId}__${cat.replace(/\W+/g,'_')}`;
+                const label = document.createElement('label');
+                label.className = 'env-option';
+                label.style.flex = '0 0 auto';
+
+                label.innerHTML = `
+                    <input type="checkbox" id="${id}" data-cat="${escapeAttr(cat)}" ${cat === current ? 'checked' : ''}>
+                    <span class="env-btn" style="min-width:110px;">${escapeHtml(cat)}</span>
+                `;
+                box.appendChild(label);
+            });
+
+            // checkbox com seleção única (tipo radio)
+            if(!box.dataset.singleSelectBound) {
+                box.addEventListener('change', (e) => {
+                    const cb = e.target.closest('input[type="checkbox"]');
+                    if (!cb) return;
+
+                    if (!cb.checked) { cb.checked = true; return; } // sempre 1 selecionada
+
+                    box.querySelectorAll('input[type="checkbox"]').forEach(x => {
+                        if (x !== cb) x.checked = false;
+                    });
+                });
+                box.dataset.singleSelectBound = '1';
+            }
+        }
+
+        function getSelectedCategory(containerId) {
+            const box = document.getElementById(containerId);
+            if(!box) return 'Geral';
+            const checked = box.querySelector('input[type="checkbox"]:checked');
+            return checked?.dataset?.cat || 'Geral';
+        }
+
+        function openHubCategoriesModal() {
+            if(isLocked) return alert("Desbloqueie o cofre primeiro.");
+            vault.hubCategories = normalizeHubCategories(vault.hubCategories, vault.hubItems);
+            document.getElementById('inpNewHubCategory').value = '';
+            renderHubCategoriesManager();
+            document.getElementById('hubCategoriesModal').style.display = 'flex';
+        }
+
+        function renderHubCategoriesManager() {
+            const box = document.getElementById('hubCategoriesList');
+            if(!box) return;
+            box.innerHTML = '';
+
+            const cats = vault.hubCategories || ['Geral'];
+            cats.forEach(cat => {
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex; align-items:center; justify-content:space-between; background:var(--bg-app); border:1px solid var(--border); padding:10px 12px; border-radius:8px;';
+                row.innerHTML = `
+                    <div style="font-weight:700;">${escapeHtml(cat)}</div>
+                    <button class="mini-btn ${cat === 'Geral' ? 'hidden' : ''}" data-cat="${escapeAttr(cat)}" title="Remover">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                `;
+                box.appendChild(row);
+            });
+        }
+
+        async function addHubCategoryFromUI() {
+            if(isLocked) return alert("Desbloqueie o cofre primeiro.");
+            const inp = document.getElementById('inpNewHubCategory');
+            const raw = (inp.value || '').trim();
+            if(!raw) return;
+
+            vault.hubCategories = normalizeHubCategories(vault.hubCategories, vault.hubItems);
+            if(vault.hubCategories.includes(raw)) {
+                inp.value = '';
+                return;
+            }
+            vault.hubCategories.push(raw);
+            vault.hubCategories = normalizeHubCategories(vault.hubCategories, vault.hubItems);
+
+            // Cria grupo vazio no Hub para aparecer imediatamente (opcional, mas ajuda UX)
+            if(!vault.hubItems.find(g => g.category === raw)) {
+                vault.hubItems.push({ category: raw, icon: 'fas fa-folder', items: [] });
+            }
+
+            await saveSmartVault(false, false);
+            inp.value = '';
+            renderHub();
+            populateSystemSelect();
+            renderHubCategoriesManager();
+        }
+
+        function onHubCategoriesListClick(e) {
+            const btn = e.target.closest('button[data-cat]');
+            if(!btn) return;
+            const cat = btn.dataset.cat;
+            if(!cat || cat === 'Geral') return;
+            if(!confirm(`Remover a categoria "${cat}"?\n\nSistemas dessa categoria serão movidos para "Geral".`)) return;
+            removeHubCategory(cat);
+        }
+
+        async function removeHubCategory(cat) {
+            if(cat === 'Geral') return;
+
+            // Move itens para Geral (não perde nada)
+            const from = (vault.hubItems || []).find(g => g.category === cat);
+            if(from && Array.isArray(from.items) && from.items.length) {
+                let geral = vault.hubItems.find(g => g.category === 'Geral');
+                if(!geral) {
+                    geral = { category: 'Geral', icon: 'fas fa-folder', items: [] };
+                    vault.hubItems.push(geral);
+                }
+                geral.items.push(...from.items);
+                from.items = [];
+            }
+
+            // Remove grupo vazio
+            vault.hubItems = (vault.hubItems || []).filter(g => g.category !== cat);
+
+            // Remove do cadastro
+            vault.hubCategories = (vault.hubCategories || []).filter(c => c !== cat);
+            vault.hubCategories = normalizeHubCategories(vault.hubCategories, vault.hubItems);
+
+            await saveSmartVault(false, false);
+            renderHub();
+            populateSystemSelect();
+            renderHubCategoriesManager();
+        }
+
+
+        function openAddHubModal() {
+            if(isLocked) return alert("Desbloqueie o cofre primeiro.");
+            document.getElementById('addHubName').value = '';
+            document.getElementById('addHubUrl').value = '';
+
+            // Garante categorias carregadas / retrocompatíveis
+            vault.hubCategories = normalizeHubCategories(vault.hubCategories, vault.hubItems);
+
+            // Renderiza checkboxes (seleção única)
+            renderCategoryCheckboxes('addHubCatBox', 'Geral');
+
+            document.getElementById('addHubModal').style.display = 'flex';
+        }
+
+
+async function saveHubSystem() {
+            const name = document.getElementById('addHubName').value;
+            const url = document.getElementById('addHubUrl').value;
+            const cat = getSelectedCategory('addHubCatBox') || "Geral";
+            if(!name || !url) return alert("Nome e URL são obrigatórios.");
+
+            vault.hubCategories = normalizeHubCategories(vault.hubCategories, vault.hubItems);
+            if(!vault.hubCategories.includes(cat)) {
+                vault.hubCategories.push(cat);
+                vault.hubCategories = normalizeHubCategories(vault.hubCategories, vault.hubItems);
+            }
+
+            let group = vault.hubItems.find(g => g.category === cat);
+            if(!group) {
+                group = { category: cat, icon: 'fas fa-folder', items: [] };
+                vault.hubItems.push(group);
+            }
+            group.items.push({ name, url, icon: 'fas fa-link' });
+
+            await saveSmartVault(false, false); 
+            closeModal('addHubModal'); renderHub(); populateSystemSelect();
+        }
+
+function populateSystemSelect() {
+            const selects = [document.getElementById('selHubSystem'), document.getElementById('delHubSelect'), document.getElementById('editHubSelect')];
+            selects.forEach(sel => {
+                sel.innerHTML = '<option value="">-- Selecione --</option>';
+                const items = vault.hubItems || defaultBtpLinks;
+                items.forEach((group, gIdx) => {
+                    const optGroup = document.createElement('optgroup'); optGroup.label = group.category;
+                    group.items.forEach((item, iIdx) => { 
+                        const opt = document.createElement('option'); 
+                        opt.value = JSON.stringify({gIdx, iIdx, name: item.name, url: item.url, cat: group.category}); 
+                        opt.innerText = item.name; 
+                        optGroup.appendChild(opt); 
+                    });
+                    sel.appendChild(optGroup);
+                });
+            });
+        }
+
+        function openEditHubModal() {
+            if(isLocked) return alert("Desbloqueie o cofre primeiro.");
+            document.getElementById('editHubSelect').value = '';
+            document.getElementById('editHubName').value = '';
+            document.getElementById('editHubUrl').value = '';
+
+            vault.hubCategories = normalizeHubCategories(vault.hubCategories, vault.hubItems);
+            renderCategoryCheckboxes('editHubCatBox', 'Geral');
+
+            document.getElementById('editHubModal').style.display = 'flex';
+        }
+
+
+function loadSystemForEdit() {
+            const sel = document.getElementById('editHubSelect');
+            if(!sel.value) return;
+            const data = JSON.parse(sel.value);
+            document.getElementById('editHubName').value = data.name;
+            document.getElementById('editHubUrl').value = data.url;
+
+            vault.hubCategories = normalizeHubCategories(vault.hubCategories, vault.hubItems);
+            renderCategoryCheckboxes('editHubCatBox', data.cat || 'Geral');
+        }
+
+
+async function saveEditedSystem() {
+            const sel = document.getElementById('editHubSelect');
+            if(!sel.value) return alert("Selecione um sistema para editar.");
+            const oldData = JSON.parse(sel.value);
+
+            const newName = document.getElementById('editHubName').value;
+            const newUrl = document.getElementById('editHubUrl').value;
+            const newCat = getSelectedCategory('editHubCatBox') || 'Geral';
+            if(!newName || !newUrl) return alert("Nome e URL são obrigatórios.");
+
+            vault.hubCategories = normalizeHubCategories(vault.hubCategories, vault.hubItems);
+            if(!vault.hubCategories.includes(newCat)) {
+                vault.hubCategories.push(newCat);
+                vault.hubCategories = normalizeHubCategories(vault.hubCategories, vault.hubItems);
+            }
+
+            // Remove old
+            vault.hubItems[oldData.gIdx].items.splice(oldData.iIdx, 1);
+            if(vault.hubItems[oldData.gIdx].items.length === 0) vault.hubItems.splice(oldData.gIdx, 1);
+
+            // Add new
+            let group = vault.hubItems.find(g => g.category === newCat);
+            if(!group) {
+                group = { category: newCat, icon: 'fas fa-folder', items: [] };
+                vault.hubItems.push(group);
+            }
+            group.items.push({ name: newName, url: newUrl, icon: 'fas fa-link' });
+
+            await saveSmartVault(false, false);
+            closeModal('editHubModal'); renderHub(); populateSystemSelect();
+        }
+        async function deleteSystemFromEdit() {
+            const sel = document.getElementById('editHubSelect');
+            if(!sel.value) return alert("Selecione um sistema.");
+            const data = JSON.parse(sel.value);
+
+            if(!confirm(`Excluir ${data.name}?`)) return;
+
+            // Tenta remover pelo índice (mais rápido). Se houver divergência, faz fallback por busca.
+            const group = vault.hubItems?.[data.gIdx];
+            const item = group?.items?.[data.iIdx];
+
+            let removed = false;
+            if(group && Array.isArray(group.items) && item && item.name === data.name && item.url === data.url) {
+                group.items.splice(data.iIdx, 1);
+                removed = true;
+                if(group.items.length === 0) vault.hubItems.splice(data.gIdx, 1);
+            } else {
+                // Fallback: procura pelo name/url dentro de todas as categorias
+                for(let g=0; g<(vault.hubItems||[]).length; g++){
+                    const gi = vault.hubItems[g];
+                    const idx = (gi.items||[]).findIndex(x => x.name === data.name && x.url === data.url);
+                    if(idx >= 0){
+                        gi.items.splice(idx, 1);
+                        removed = true;
+                        if(gi.items.length === 0) vault.hubItems.splice(g, 1);
+                        break;
+                    }
+                }
+            }
+
+            if(!removed) return alert("Não foi possível localizar o sistema para excluir (lista desatualizada). Feche e abra o editor novamente.");
+
+            await saveSmartVault(false, false);
+            closeModal('editHubModal');
+            renderHub();
+            populateSystemSelect();
+        }
+
+
+
+function openDelHubModal() {
+            if(isLocked) return alert("Desbloqueie o cofre primeiro.");
+            document.getElementById('delHubSelect').value = '';
+            document.getElementById('delHubModal').style.display = 'flex';
+        }
+
+        async function deleteSystem() {
+            const sel = document.getElementById('delHubSelect');
+            if(!sel.value) return alert("Selecione um sistema.");
+            const data = JSON.parse(sel.value);
+            
+            if(!confirm(`Excluir ${data.name}?`)) return;
+
+            vault.hubItems[data.gIdx].items.splice(data.iIdx, 1);
+            if(vault.hubItems[data.gIdx].items.length === 0) vault.hubItems.splice(data.gIdx, 1);
+
+            await saveSmartVault(false, false);
+            closeModal('delHubModal'); renderHub(); populateSystemSelect();
+        }
+
+        function addHubTagFromSelect() {
+            const sel = document.getElementById('selHubSystem');
+            if(!sel.value) return;
+            const data = JSON.parse(sel.value);
+            if (!tempLinkedSystems.some(s => s.name === data.name)) {
+                tempLinkedSystems.push(data);
+                if (tempLinkedSystems.length === 1) {
+                    if(document.getElementById('inpService').value.trim() === '') document.getElementById('inpService').value = data.name;
+                    if(document.getElementById('inpUrl').value.trim() === '') document.getElementById('inpUrl').value = data.url;
+                    ['chkDev','chkQas','chkPrd','chkAdm'].forEach(x=>document.getElementById(x).checked=false);
+                    const nameUpper = data.name.toUpperCase();
+                    if(nameUpper.includes('DEV')) document.getElementById('chkDev').checked = true;
+                    if(nameUpper.includes('QAS')) document.getElementById('chkQas').checked = true;
+                    if(nameUpper.includes('PRD')) document.getElementById('chkPrd').checked = true;
+                    if(nameUpper.includes('ADM')) document.getElementById('chkAdm').checked = true;
+                }
+                renderHubTags();
+            }
+            sel.value = "";
+        }
+
+        function removeHubTag(index) { tempLinkedSystems.splice(index, 1); renderHubTags(); }
+        function renderHubTags() {
+            const container = document.getElementById('hubTagsContainer'); container.innerHTML = '';
+            tempLinkedSystems.forEach((sys, idx) => {
+                // Refactor: Added data-index for Event Delegation
+                const tag = document.createElement('div'); tag.className = 'hub-tag'; 
+                tag.innerHTML = `<span>${sys.name}</span> <i class="fas fa-times" data-index="${idx}"></i>`; 
+                container.appendChild(tag);
+            });
+        }
+
+        function toggleHub(forceState = null) {
+            hubMode = forceState !== null ? forceState : !hubMode;
+            const sidebar = document.getElementById('sidebarPanel'), details = document.getElementById('detailsPanel'), hub = document.getElementById('hubPanel'), btn = document.getElementById('btnHubToggle');
+            if (hubMode) { sidebar.classList.add('hidden'); details.classList.add('hidden'); hub.classList.add('active'); btn.classList.add('active'); } 
+            else { sidebar.classList.remove('hidden'); details.classList.remove('hidden'); hub.classList.remove('active'); btn.classList.remove('active'); }
+        }
+
+        function interactWithSystem(url, name) {
+            window.open(url, '_blank');
+            if(isLocked) return; 
+            
+            toggleHub(false); 
+            const searchInput = document.getElementById('searchInput'); 
+            searchInput.value = url; 
+            renderList();
+            if (document.getElementById('entryList').children.length === 0) { searchInput.value = name; renderList(); }
+
+            const exactMatch = vault.entries.find(e => {
+                const linkedMatch = e.linked_systems && e.linked_systems.some(s => s.name === name);
+                const urlMatch = e.url === url;
+                const nameMatch = e.service === name;
+                return linkedMatch || urlMatch || nameMatch;
+            });
+            if (exactMatch) selectEntry(exactMatch.id);
+        }
+
+        function addFromHub(name, url) {
+            if(isLocked) return alert("Desbloqueie o cofre primeiro.");
+            toggleHub(false); openEntryModal();
+            tempLinkedSystems = [{name, url}];
+            document.getElementById('inpService').value = name; document.getElementById('inpUrl').value = url;
+            if(name.includes('DEV')) document.getElementById('chkDev').checked = true;
+            if(name.includes('QAS')) document.getElementById('chkQas').checked = true;
+            if(name.includes('PRD')) document.getElementById('chkPrd').checked = true;
+            renderHubTags();
+        }
+
+        function readFileContent(file) { const r = new FileReader(); r.onload = (e) => { try{currentVaultData=JSON.parse(e.target.result); showUnlockModal();}catch(x){alert("JSON inválido");} }; r.readAsText(file); }
+
+        async function openSmartFile() {
+            if(window.showOpenFilePicker){ try{ [fileHandle]=await window.showOpenFilePicker({types:[{description:'Cofre', accept:{'application/json':['.json']}}]}); await saveFileHandleToDB(fileHandle); readFileContent(await fileHandle.getFile()); } catch(e){} } else document.getElementById('fileInput').click();
+        }
+        function handleLegacyFileSelect(e){ if(e.target.files[0]) readFileContent(e.target.files[0]); }
+
+        async function reopenLastFile() {
+            if (!fileHandle) return;
+            try {
+                const opts = { mode: 'read' };
+                if ((await fileHandle.queryPermission(opts)) === 'granted' || (await fileHandle.requestPermission(opts)) === 'granted') {
+                    const file = await fileHandle.getFile(); readFileContent(file);
+                }
+            } catch (err) { alert("Não foi possível reabrir automaticamente."); openSmartFile(); }
+        }
+
+        function importExcel() { 
+            alert("O arquivo Excel deve conter as colunas na seguinte ordem:\n\n1. Serviço\n2. Usuário\n3. Senha\n4. URL\n5. Notas\n6. Ambientes (Opcional)\n\nO sistema irá ignorar a primeira linha (cabeçalho).");
+            const input = document.createElement('input'); input.type='file'; input.accept='.xlsx'; input.onchange = (e) => readExcelFile(e.target.files[0]); input.click(); 
+        }
+        function readExcelFile(file) {
+            if(isLocked) return alert("Desbloqueie o cofre primeiro.");
+            const r = new FileReader();
+            r.onload = async (evt) => {
+                const wb = XLSX.read(evt.target.result, {type: 'array'});
+                const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1});
+                let count=0;
+                for(let i=1; i<rows.length; i++) {
+                    const r = rows[i];
+                    if(r.length>=3 && r[0] && r[1]) {
+                        if(!vault.entries.some(e=>e.service===r[0] && e.username===r[1])) {
+                            vault.entries.push({ id: crypto.randomUUID().slice(0,8), service:String(r[0]), username:String(r[1]), password:String(r[2]), url:r[3]?String(r[3]):"", notes:r[4]?String(r[4]):"", envs:[], linked_systems: [], created_at:nowIso(), updated_at:nowIso() });
+                            count++;
+                        }
+                    }
+                }
+                await encryptVault(); alert(`Importados: ${count}`); renderList();
+            };
+            r.readAsArrayBuffer(file);
+        }
+
+        function exportExcel() {
+            if(isLocked) return;
+            if(!confirm("Atenção: O arquivo Excel NÃO será criptografado.")) return;
+            const exportData = vault.entries.map(e => ({ Servico: e.service, Usuario: e.username, Senha: e.password, URL: e.url, Notas: e.notes, Sistemas_Vinculados: e.linked_systems ? e.linked_systems.map(s=>s.name).join(', ') : '' }));
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Senhas"); XLSX.writeFile(wb, "PassMan_Export.xlsx");
+        }
+
+        
+
+        // =========================
+        // Import/Export de SISTEMAS (Hub)
+        // =========================
+        function importSystemsExcel() {
+            if(isLocked) return alert("Desbloqueie o cofre primeiro.");
+            alert(
+                "O arquivo Excel deve conter as colunas na seguinte ordem:\n\n" +
+                "1. Categoria (Opcional - padrão: Geral)\n" +
+                "2. Sistema (Nome)\n" +
+                "3. URL\n" +
+                "4. Ícone (Opcional - ex: fas fa-book)\n\n" +
+                "O sistema irá ignorar a primeira linha (cabeçalho) e ADICIONAR itens sem substituir os existentes."
+            );
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.xlsx';
+            input.onchange = (e) => readSystemsExcelFile(e.target.files[0]);
+            input.click();
+        }
+
+        function readSystemsExcelFile(file) {
+            if(isLocked) return alert("Desbloqueie o cofre primeiro.");
+            const r = new FileReader();
+            r.onload = async (evt) => {
+                const wb = XLSX.read(evt.target.result, { type: 'array' });
+                const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+
+                // Garantir estruturas
+                vault.hubItems = Array.isArray(vault.hubItems) ? vault.hubItems : [];
+                vault.hubCategories = normalizeHubCategories(vault.hubCategories, vault.hubItems);
+
+                let count = 0;
+                for (let i = 1; i < rows.length; i++) {
+                    const row = rows[i] || [];
+                    const rawCat = (row[0] !== undefined && row[0] !== null) ? String(row[0]).trim() : "";
+                    const name = (row[1] !== undefined && row[1] !== null) ? String(row[1]).trim() : "";
+                    const url = (row[2] !== undefined && row[2] !== null) ? String(row[2]).trim() : "";
+                    const icon = (row[3] !== undefined && row[3] !== null) ? String(row[3]).trim() : "";
+
+                    if (!name || !url) continue;
+
+                    const cat = rawCat ? rawCat : "Geral";
+
+                    // Se categoria não existir, cria
+                    if (!vault.hubCategories.includes(cat)) {
+                        vault.hubCategories.push(cat);
+                        vault.hubCategories = normalizeHubCategories(vault.hubCategories, vault.hubItems);
+                    }
+
+                    // Garantir grupo no hubItems
+                    let group = vault.hubItems.find(g => g.category === cat);
+                    if (!group) {
+                        group = { category: cat, icon: "fas fa-folder", items: [] };
+                        vault.hubItems.push(group);
+                    }
+                    group.items = Array.isArray(group.items) ? group.items : [];
+
+                    // Dedupe por (name + url) em qualquer categoria
+                    const exists = (vault.hubItems || []).some(g =>
+                        (g.items || []).some(it =>
+                            (String(it.name || '').trim().toLowerCase() === name.toLowerCase()) &&
+                            (String(it.url || '').trim().toLowerCase() === url.toLowerCase())
+                        )
+                    );
+                    if (exists) continue;
+
+                    group.items.push({
+                        id: crypto.randomUUID().slice(0, 8),
+                        name,
+                        url,
+                        icon: icon || "fas fa-book",
+                        created_at: nowIso(),
+                        updated_at: nowIso()
+                    });
+
+                    count++;
+                }
+
+                // Normaliza novamente (mantém Geral, ordena etc.)
+                vault.hubCategories = normalizeHubCategories(vault.hubCategories, vault.hubItems);
+
+                await saveSmartVault(false, false);
+                showToast(`Sistemas importados: ${count}`);
+                renderHub();
+                populateSystemSelect();
+            };
+            r.readAsArrayBuffer(file);
+        }
+
+        function exportSystemsExcel() {
+            if(isLocked) return;
+            if(!confirm("Atenção: O arquivo Excel NÃO será criptografado.")) return;
+
+            const exportData = [];
+            (vault.hubItems || []).forEach(group => {
+                const cat = group.category || "Geral";
+                (group.items || []).forEach(item => {
+                    exportData.push({
+                        Categoria: cat,
+                        Sistema: item.name || "",
+                        URL: item.url || "",
+                        Icone: item.icon || ""
+                    });
+                });
+            });
+
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Sistemas");
+            XLSX.writeFile(wb, "PassMan_Sistemas_Export.xlsx");
+        }
+
+async function saveSmartVault(forceDownload = true, showNotification = true) {
+            if (isLocked) return;
+            const encrypted = await encryptVault(); const content = JSON.stringify(encrypted, null, 2);
+
+            // Modo GitHub: salva na API
+            if (ghIsConfigured()) {
+                const ok = await ghSaveVault();
+                if (ok && showNotification) showToast("Cofre salvo no GitHub!");
+                return;
+            }
+
+            // Modo local: File System Access API
+            if (fileHandle) { try { const w = await fileHandle.createWritable(); await w.write(content); await w.close(); if(showNotification) showToast("Cofre salvo!"); return; } catch (e) {} }
+            if(forceDownload) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([content], {type:"application/json"})); a.download="vault.json"; a.click(); }
+        }
+
+        async function createNewVault() {
+            const pwd = prompt("Nova Senha Mestra:"); if(!pwd) return;
+            const salt = crypto.getRandomValues(new Uint8Array(SALT_LEN));
+            vault = { header: {version:1, kdf:{salt:bufToB64(salt), iterations:PBKDF2_ITERATIONS}}, entries:[], hubItems: defaultBtpLinks, hubCategories: normalizeHubCategories(null, defaultBtpLinks) };
+            masterKey = await deriveKey(pwd, salt); fileHandle = null; unlockUI();
+        }
+
+        function showUnlockModal() {
+            document.getElementById('pwdInputContainer').classList.toggle('hidden', !currentVaultData);
+            document.getElementById('modalFooterInit').classList.toggle('hidden', !!currentVaultData);
+            document.getElementById('modalFooterUnlock').classList.toggle('hidden', !currentVaultData);
+            document.getElementById('passwordModal').style.display = 'flex';
+            if(currentVaultData) document.getElementById('masterPwd').focus();
+        }
+
+        async function unlockVault() {
+            const pwd = document.getElementById('masterPwd').value;
+            if(await decryptVault(currentVaultData, pwd)) { document.getElementById('masterPwd').value=''; unlockUI(); } else alert("Senha incorreta");
+        }
+
+        function unlockUI() {
+            isLocked = false;
+            document.getElementById('passwordModal').style.display = 'none';
+            document.getElementById('main-area').classList.remove('blur');
+            toggleHub(false);
+            ['btnSave','btnLock','btnAdd','btnEdit','btnDel','btnImport','btnExport','btnImportSystems','btnExportSystems'].forEach(i=>document.getElementById(i).disabled=false);
+            if (ghIsConfigured()) document.getElementById('btnGhSync').disabled = false;
+            fixLegacyIcons(); // AUTO-CORRECT ICONS ON UNLOCK
+            renderList();
+            renderHub(); 
+            populateSystemSelect();
+            resetAutoLock(); // Start OpSec timer
+        }
+
+        function lockVault() {
+            isLocked = true; vault.entries=[]; vault.hubItems=[]; masterKey=null;
+            clearTimeout(autoLockTimer); // Clear timer
+            document.getElementById('entryList').innerHTML = '';
+            document.getElementById('detailsPanel').classList.remove('active'); 
+            document.getElementById('main-area').classList.add('blur');
+            ['btnSave','btnLock','btnImport','btnExport','btnImportSystems','btnExportSystems','btnGhSync'].forEach(i=>document.getElementById(i).disabled=true);
+            toggleHub(false); showUnlockModal();
+        }
+
+        // --- UI UTILS & SEARCH CLEAR ---
+        function renderList() {
+            const list = document.getElementById('entryList'); list.innerHTML = '';
+            const clearBtn = document.getElementById('btnSearchClear');
+            if (isLocked) return;
+            
+            const q = document.getElementById('searchInput').value.toLowerCase();
+            clearBtn.style.display = q.length > 0 ? 'block' : 'none'; // Toggle clear button
+
+            vault.entries.filter(e => {
+                const mainMatch = (e.service+e.username+e.url+(e.notes||'')).toLowerCase().includes(q);
+                const linkMatch = e.linked_systems ? e.linked_systems.some(s => s.name.toLowerCase().includes(q) || s.url.toLowerCase().includes(q)) : false;
+                return mainMatch || linkMatch;
+            }).sort((a,b)=>a.service.localeCompare(b.service)).forEach(e => {
+                // Refactor: Added data-id for Event Delegation
+                const li = document.createElement('li'); li.className = `entry-item ${e.id===selectedId?'active':''}`;
+                li.setAttribute('data-id', e.id);
+                li.innerHTML = `<div class="entry-title">${e.service}</div><div class="entry-sub"><span>${e.username}</span></div>`;
+                list.appendChild(li);
+            });
+        }
+        let debounceTimer; function debounceSearch(){ clearTimeout(debounceTimer); debounceTimer=setTimeout(renderList, 300); }
+        function clearSearch() { document.getElementById('searchInput').value = ''; renderList(); document.getElementById('searchInput').focus(); }
+
+        function closeDetailsIfBackground(e) {
+            if (e.target.id === 'detailsPanel') {
+                selectedId = null;
+                renderList(); 
+                document.getElementById('detailsCard').classList.add('hidden');
+            }
+        }
+
+        function selectEntry(id) {
+            selectedId = id; renderList();
+            const e = vault.entries.find(x => x.id === id); if (!e) return;
+            document.getElementById('detService').textContent = e.service;
+            document.getElementById('detUser').textContent = e.username;
+            const p = document.getElementById('detPass'); p.textContent = '••••••••'; p.dataset.real = e.password;
+            const urlEl = document.getElementById('detUrl');
+            urlEl.textContent = e.url || '-'; 
+            urlEl.href = (e.url && e.url.startsWith('http')) ? e.url : '#';
+            urlEl.rel = "noopener noreferrer"; // OpSec
+            
+            const linkGroup = document.getElementById('groupLinkedSystems');
+            const linkContainer = document.getElementById('detHubLinks'); linkContainer.innerHTML = '';
+            
+            if (e.linked_systems && e.linked_systems.length > 0) {
+                linkGroup.style.display = 'block';
+                e.linked_systems.forEach(sys => {
+                    const a = document.createElement('a'); 
+                    a.href = sys.url; a.target = '_blank'; a.rel = "noopener noreferrer"; // OpSec
+                    a.className = 'link-btn';
+                    a.innerHTML = `<span><i class="fas fa-external-link-alt"></i> ${sys.name}</span> <i class="fas fa-chevron-right" style="font-size:0.8rem; color:#ccc;"></i>`;
+                    linkContainer.appendChild(a);
+                });
+            } else { linkGroup.style.display = 'none'; }
+
+            document.getElementById('detNotes').textContent = e.notes || '-';
+            const envsDiv = document.getElementById('detEnvs'); envsDiv.innerHTML = '';
+            if(e.envs) e.envs.forEach(env => { const tag = document.createElement('span'); tag.className = `env-tag tag-${env.toLowerCase()}`; tag.textContent = env; envsDiv.appendChild(tag); });
+            
+            document.getElementById('detailsCard').classList.remove('hidden');
+            document.getElementById('detailsPanel').classList.remove('hidden'); 
+            if(window.innerWidth <= 768) { document.getElementById('detailsPanel').classList.add('active'); }
+        }
+
+        function closeDetailsMobile() { document.getElementById('detailsPanel').classList.remove('active'); selectedId = null; renderList(); }
+
+        function openEntryModal(e = null) {
+            document.getElementById('entryModal').style.display = 'flex';
+            document.getElementById('inpPass').type = 'password';
+            ['chkDev','chkQas','chkPrd','chkAdm'].forEach(x=>document.getElementById(x).checked=false);
+            
+            document.getElementById('selHubSystem').value = "";
+            tempLinkedSystems = [];
+
+            if (e) {
+                document.getElementById('entryModalTitle').innerText = 'Editar Credencial';
+                document.getElementById('entryId').value = e.id;
+                document.getElementById('inpService').value = e.service;
+                document.getElementById('inpUser').value = e.username;
+                document.getElementById('inpPass').value = e.password;
+                document.getElementById('inpUrl').value = e.url;
+                document.getElementById('inpNotes').value = e.notes;
+                if(e.envs) e.envs.forEach(env => { try{document.getElementById(`chk${env.charAt(0)+env.slice(1).toLowerCase()}`).checked=true}catch(z){} });
+                if(e.linked_systems) tempLinkedSystems = [...e.linked_systems];
+            } else {
+                document.getElementById('entryModalTitle').innerText = 'Nova Credencial';
+                document.getElementById('entryId').value = '';
+                ['inpService','inpUser','inpPass','inpUrl','inpNotes'].forEach(x=>document.getElementById(x).value='');
+            }
+            renderHubTags();
+        }
+        function closeModal(id){ document.getElementById(id).style.display='none'; }
+        
+        async function saveEntry() {
+            const id = document.getElementById('entryId').value;
+            const srv = document.getElementById('inpService').value;
+            const usr = document.getElementById('inpUser').value;
+            const pwd = document.getElementById('inpPass').value;
+            if(!srv || !usr || !pwd) return alert("Preencha campos obrigatórios");
+            
+            const envs = [];
+            ['Dev','Qas','Prd','Adm'].forEach(x => { if(document.getElementById('chk'+x).checked) envs.push(x.toUpperCase()); });
+
+            const entry = {
+                id: id || crypto.randomUUID().slice(0,8),
+                service: srv, username: usr, password: pwd,
+                url: document.getElementById('inpUrl').value,
+                notes: document.getElementById('inpNotes').value,
+                envs: envs, linked_systems: tempLinkedSystems, updated_at: nowIso(),
+                created_at: id ? vault.entries.find(x=>x.id===id).created_at : nowIso()
+            };
+
+            if(id) vault.entries[vault.entries.findIndex(x=>x.id===id)] = entry;
+            else vault.entries.push(entry);
+
+            closeModal('entryModal'); renderList(); if(hubMode) toggleHub(false); selectEntry(entry.id);
+        }
+
+        function deleteCurrentEntry() {
+            if(confirm("Excluir este registro?")) {
+                vault.entries = vault.entries.filter(e => e.id !== selectedId);
+                selectedId = null; closeDetailsMobile(); renderList();
+                document.getElementById('detailsCard').classList.add('hidden');
+            }
+        }
+        function editCurrentEntry() { const e = vault.entries.find(x=>x.id===selectedId); if(e) openEntryModal(e); }
+        
+        function copyPass(){ 
+            const pwd = document.getElementById('detPass').dataset.real;
+            navigator.clipboard.writeText(pwd).then(() => {
+                showToast("Senha copiada! Será limpa em 60s.");
+                clearClipboardAfterDelay();
+            });
+        }
+        function copyUser(){ 
+            const usr = document.getElementById('detUser').textContent;
+            navigator.clipboard.writeText(usr).then(() => {
+                showToast("Usuário copiado! Será limpo em 60s.");
+                clearClipboardAfterDelay();
+            });
+        }
+        function togglePass(){ const el=document.getElementById('detPass'); el.textContent = el.textContent==='••••••••'?el.dataset.real:'••••••••'; }
+        function toggleInputPassType(){ const i=document.getElementById('inpPass'); i.type = i.type==='password'?'text':'password'; }
+
+        // =====================================================
+        // GITHUB SYNC — lê e escreve vault.json via GitHub API
+        // =====================================================
+
+        const GH_STORAGE_KEY = 'passman_gh_config';
+
+        function ghLoadConfig() {
+            try { return JSON.parse(localStorage.getItem(GH_STORAGE_KEY)) || {}; } catch(e) { return {}; }
+        }
+        function ghSaveConfig(cfg) {
+            localStorage.setItem(GH_STORAGE_KEY, JSON.stringify(cfg));
+        }
+        function ghClearConfig() {
+            localStorage.removeItem(GH_STORAGE_KEY);
+        }
+        function ghIsConfigured() {
+            const c = ghLoadConfig();
+            return !!(c.token && c.owner && c.repo && c.path);
+        }
+
+        function ghSetStatus(state, text) {
+            const badge = document.getElementById('ghStatusBadge');
+            const label = document.getElementById('ghStatusText');
+            badge.className = `gh-status ${state}`;
+            label.textContent = text;
+        }
+
+        function ghUpdateUI() {
+            const configured = ghIsConfigured();
+            const syncBtn = document.getElementById('btnGhSync');
+            if (configured) {
+                ghSetStatus('connected', 'GitHub');
+                if (!isLocked) syncBtn.disabled = false;
+            } else {
+                ghSetStatus('disconnected', 'Offline');
+                syncBtn.disabled = true;
+            }
+        }
+
+        // Abre modal e preenche campos salvos
+        function ghOpenConfigModal() {
+            const c = ghLoadConfig();
+            document.getElementById('ghToken').value = c.token || '';
+            document.getElementById('ghOwner').value = c.owner || '';
+            document.getElementById('ghRepo').value = c.repo || '';
+            document.getElementById('ghPath').value = c.path || 'vault.json';
+            document.getElementById('ghConfigModal').style.display = 'flex';
+        }
+
+        function ghCloseConfigModal() {
+            document.getElementById('ghConfigModal').style.display = 'none';
+        }
+
+        async function ghSaveAndConnect() {
+            const token = document.getElementById('ghToken').value.trim();
+            const owner = document.getElementById('ghOwner').value.trim();
+            const repo  = document.getElementById('ghRepo').value.trim();
+            const path  = document.getElementById('ghPath').value.trim() || 'vault.json';
+
+            if (!token || !owner || !repo) return alert('Preencha Token, Usuário e Repositório.');
+
+            ghSetStatus('syncing', 'Testando...');
+            // Testa acesso ao repo
+            try {
+                const r = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
+                    headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' }
+                });
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            } catch(e) {
+                ghSetStatus('error', 'Erro');
+                return alert(`Não foi possível acessar o repositório.\nVerifique o token e o nome do repositório.\n\nDetalhe: ${e.message}`);
+            }
+
+            ghSaveConfig({ token, owner, repo, path });
+            ghCloseConfigModal();
+            ghUpdateUI();
+            showToast('GitHub configurado com sucesso!');
+
+            // Se o cofre ainda não foi aberto, tenta carregar do GitHub
+            if (isLocked && !currentVaultData) {
+                await ghLoadVault();
+            }
+        }
+
+        // Carrega vault.json do GitHub e abre modal de senha
+        async function ghLoadVault() {
+            if (!ghIsConfigured()) return;
+            const c = ghLoadConfig();
+            ghSetStatus('syncing', 'Carregando...');
+            try {
+                const r = await fetch(
+                    `https://api.github.com/repos/${c.owner}/${c.repo}/contents/${c.path}`,
+                    { headers: { Authorization: `token ${c.token}`, Accept: 'application/vnd.github.v3+json' } }
+                );
+                if (r.status === 404) {
+                    ghSetStatus('connected', 'GitHub');
+                    showToast('vault.json não encontrado no repositório. Crie um novo cofre.');
+                    showUnlockModal();
+                    return;
+                }
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                const data = await r.json();
+                const decoded = atob(data.content.replace(/\n/g, ''));
+                currentVaultData = JSON.parse(decoded);
+                // Guarda o SHA para poder fazer PUT depois
+                ghCurrentSha = data.sha;
+                ghSetStatus('connected', 'GitHub');
+                showUnlockModal();
+            } catch(e) {
+                ghSetStatus('error', 'Erro');
+                showToast(`Erro ao carregar do GitHub: ${e.message}`);
+            }
+        }
+
+        let ghCurrentSha = null; // SHA do arquivo no GitHub (necessário para atualizar)
+
+        // Salva vault.json criptografado no GitHub via API
+        async function ghSaveVault() {
+            if (!ghIsConfigured() || isLocked) return false;
+            const c = ghLoadConfig();
+            const encrypted = await encryptVault();
+            if (!encrypted) return false;
+            const content = JSON.stringify(encrypted, null, 2);
+            const b64 = btoa(unescape(encodeURIComponent(content)));
+
+            ghSetStatus('syncing', 'Salvando...');
+            try {
+                const body = {
+                    message: `PassMan sync ${new Date().toISOString()}`,
+                    content: b64,
+                    ...(ghCurrentSha ? { sha: ghCurrentSha } : {})
+                };
+                const r = await fetch(
+                    `https://api.github.com/repos/${c.owner}/${c.repo}/contents/${c.path}`,
+                    {
+                        method: 'PUT',
+                        headers: {
+                            Authorization: `token ${c.token}`,
+                            Accept: 'application/vnd.github.v3+json',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(body)
+                    }
+                );
+                if (!r.ok) {
+                    const err = await r.json();
+                    throw new Error(err.message || `HTTP ${r.status}`);
+                }
+                const resp = await r.json();
+                ghCurrentSha = resp.content.sha; // atualiza SHA para próximo save
+                ghSetStatus('connected', 'GitHub ✓');
+                setTimeout(() => ghUpdateUI(), 2000);
+                return true;
+            } catch(e) {
+                ghSetStatus('error', 'Erro sync');
+                showToast(`Erro ao salvar no GitHub: ${e.message}`);
+                return false;
+            }
+        }
+
+        // Setup dos event listeners do GitHub
+        function setupGithubListeners() {
+            document.getElementById('btnGhConfig').addEventListener('click', ghOpenConfigModal);
+            document.getElementById('btnGhConfigSave').addEventListener('click', ghSaveAndConnect);
+            document.getElementById('btnGhConfigCancel').addEventListener('click', ghCloseConfigModal);
+            document.getElementById('btnGhClear').addEventListener('click', () => {
+                if (confirm('Remover configuração do GitHub deste navegador?')) {
+                    ghClearConfig();
+                    ghCloseConfigModal();
+                    ghUpdateUI();
+                    showToast('Configuração removida.');
+                }
+            });
+            document.getElementById('btnGhSync').addEventListener('click', async () => {
+                const ok = await ghSaveVault();
+                if (ok) showToast('Cofre sincronizado com GitHub!');
+            });
+        }
+    </script>
+</body>
+</html>
