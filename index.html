@@ -499,7 +499,9 @@
         async function encryptVault() {
             if (!masterKey) return null;
             const iv = crypto.getRandomValues(new Uint8Array(IV_LEN));
-            const dataEnc = new TextEncoder().encode(JSON.stringify({ entries: vault.entries, hubItems: vault.hubItems, hubCategories: vault.hubCategories }));
+            // Inclui config do GitHub dentro do vault criptografado
+            const ghConfig = ghLoadConfig();
+            const dataEnc = new TextEncoder().encode(JSON.stringify({ entries: vault.entries, hubItems: vault.hubItems, hubCategories: vault.hubCategories, ghConfig: ghConfig }));
             const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, masterKey, dataEnc);
             return { version: vault.header.version, kdf: vault.header.kdf, payload: { nonce: bufToB64(iv), ciphertext: bufToB64(ct) } };
         }
@@ -516,6 +518,11 @@
                 vault.entries = data.entries || [];
                 vault.hubItems = data.hubItems || defaultBtpLinks;
                 vault.hubCategories = normalizeHubCategories(data.hubCategories, vault.hubItems);
+                // Restaura config do GitHub do vault (se existir) para o localStorage
+                if (data.ghConfig && data.ghConfig.token) {
+                    ghSaveConfig(data.ghConfig);
+                    ghUpdateUI();
+                }
                 return true;
             } catch (e) { return false; }
         }
@@ -566,12 +573,17 @@
             document.getElementById('passwordModal').style.display = 'none';
             if(isLocked) { vault.hubItems = defaultBtpLinks; renderHub(); }
 
-            // Se GitHub está configurado, carrega vault automaticamente
+            // Se GitHub já está configurado neste browser, carrega direto
             if (ghIsConfigured()) {
-                await ghLoadVault(); // ghLoadVault chama showUnlockModal após carregar
+                await ghLoadVault();
             } else {
-                // GitHub não configurado: abre direto a config do GitHub
-                ghOpenConfigModal();
+                // Tenta bootstrap: carrega vault via URL raw do GitHub (sem token)
+                // O vault.json fica em repositório público — só o conteúdo é criptografado
+                const bootstrapped = await ghBootstrap();
+                if (!bootstrapped) {
+                    // Sem config e sem bootstrap: abre modal de configuração
+                    ghOpenConfigModal();
+                }
             }
         });
 
@@ -1328,12 +1340,13 @@ async function saveSmartVault(forceDownload = true, showNotification = true) {
             document.getElementById('main-area').classList.remove('blur');
             toggleHub(false);
             ['btnSave','btnLock','btnAdd','btnEdit','btnDel','btnImport','btnExport','btnImportSystems','btnExportSystems'].forEach(i=>document.getElementById(i).disabled=false);
-            if (ghIsConfigured()) document.getElementById('btnGhSync').disabled = false;
-            fixLegacyIcons(); // AUTO-CORRECT ICONS ON UNLOCK
+            // ghConfig pode ter sido restaurada agora pelo decryptVault — atualiza UI
+            ghUpdateUI();
+            fixLegacyIcons();
             renderList();
             renderHub(); 
             populateSystemSelect();
-            resetAutoLock(); // Start OpSec timer
+            resetAutoLock();
         }
 
         function lockVault() {
@@ -1497,6 +1510,39 @@ async function saveSmartVault(forceDownload = true, showNotification = true) {
         // =====================================================
 
         const GH_STORAGE_KEY = 'passman_gh_config';
+        // URL raw do vault.json no repositório público — ajuste para o seu repositório
+        // Formato: https://raw.githubusercontent.com/USUARIO/REPO/main/vault.json
+        const GH_RAW_VAULT_URL = (() => {
+            // Tenta inferir a URL a partir do hostname do GitHub Pages
+            // Ex: sadouglasdh.github.io/passman → raw.githubusercontent.com/sadouglasdh/passman/main/vault.json
+            const host = window.location.hostname;
+            const path = window.location.pathname.replace(/\/$/, '').replace(/^\//, '');
+            if (host.endsWith('.github.io')) {
+                const user = host.replace('.github.io', '');
+                const repo = path || 'passman';
+                return `https://raw.githubusercontent.com/${user}/${repo}/main/vault.json`;
+            }
+            return null; // Netlify ou outro host: não tem como inferir
+        })();
+
+        // Bootstrap: carrega vault via URL raw pública (sem token)
+        // Após descriptografar, a ghConfig é extraída de dentro e salva no localStorage
+        async function ghBootstrap() {
+            if (!GH_RAW_VAULT_URL) return false;
+            try {
+                ghSetStatus('syncing', 'Carregando...');
+                const r = await fetch(GH_RAW_VAULT_URL + '?_=' + Date.now()); // cache bust
+                if (!r.ok) { ghSetStatus('disconnected', 'Offline'); return false; }
+                const data = await r.json();
+                currentVaultData = data;
+                ghSetStatus('connected', 'GitHub');
+                showUnlockModal(); // Pede senha mestra — ao desbloquear, ghConfig é restaurada
+                return true;
+            } catch(e) {
+                ghSetStatus('disconnected', 'Offline');
+                return false;
+            }
+        }
 
         function ghLoadConfig() {
             try { return JSON.parse(localStorage.getItem(GH_STORAGE_KEY)) || {}; } catch(e) { return {}; }
