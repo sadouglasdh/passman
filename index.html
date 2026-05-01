@@ -554,27 +554,25 @@
             setupGithubListeners();
             ghUpdateUI();
 
-            // Se GitHub está configurado, carrega vault de lá automaticamente
-            if (ghIsConfigured()) {
-                await ghLoadVault();
-            } else {
-                // Modo local: tenta reabrir último arquivo
-                const record = await getLastFileHandle();
-                if (record && record.handle) {
-                    document.getElementById('lastFileName').textContent = record.name;
-                    document.getElementById('btnReopen').classList.remove('hidden');
-                    fileHandle = record.handle; 
-                }
-                if(isLocked) { vault.hubItems = defaultBtpLinks; renderHub(); }
-            }
-
             // Attach Event Listeners
             setupEventListeners();
-            
+
             // OpSec Activity Hooks
             ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(evt => {
                 window.addEventListener(evt, resetAutoLock);
             });
+
+            // Fecha o modal padrão — o app controla o fluxo
+            document.getElementById('passwordModal').style.display = 'none';
+            if(isLocked) { vault.hubItems = defaultBtpLinks; renderHub(); }
+
+            // Se GitHub está configurado, carrega vault automaticamente
+            if (ghIsConfigured()) {
+                await ghLoadVault(); // ghLoadVault chama showUnlockModal após carregar
+            } else {
+                // GitHub não configurado: abre direto a config do GitHub
+                ghOpenConfigModal();
+            }
         });
 
         document.body.addEventListener('dragover', (e)=>{e.preventDefault(); document.body.classList.add('drag-over');});
